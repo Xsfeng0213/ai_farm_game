@@ -13,7 +13,12 @@ export function registerSocketHandlers(io: GameServer): void {
         roomId: payload.roomId || DEFAULT_ROOM,
         nickname: payload.nickname
       };
-      const { roomState, player } = roomManager.join(socket.id, joinPayload);
+      const { roomState, player, leftRoomId } = roomManager.join(socket.id, joinPayload);
+
+      if (leftRoomId && leftRoomId !== roomState.roomId) {
+        socket.leave(leftRoomId);
+        socket.to(leftRoomId).emit('player_left', { id: socket.id });
+      }
 
       socket.join(roomState.roomId);
       socket.emit('room_state', roomState);

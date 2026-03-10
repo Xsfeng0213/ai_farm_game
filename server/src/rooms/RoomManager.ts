@@ -23,18 +23,26 @@ export class RoomManager {
   private readonly players = new Map<string, PlayerRecord>();
   private readonly roomMembers = new Map<RoomId, Set<string>>();
 
-  join(socketId: string, payload: JoinRoomPayload): { roomState: RoomStatePayload; player: PlayerSnapshot } {
+  join(socketId: string, payload: JoinRoomPayload): {
+    roomState: RoomStatePayload;
+    player: PlayerSnapshot;
+    leftRoomId: RoomId | null;
+  } {
+    const previous = this.players.get(socketId);
     const nickname = this.sanitizeNickname(payload.nickname);
     const roomId = payload.roomId || ROOM_FALLBACK;
+
+    const leftRoomId = this.leaveRoomMembership(socketId, previous?.roomId ?? null);
+
     const player: PlayerRecord = {
       id: socketId,
       socketId,
       nickname,
       roomId,
-      position: this.spawnPosition(),
-      direction: 'down',
-      state: 'idle',
-      coins: 0
+      position: this.spawnPosition(roomId),
+      direction: previous?.direction ?? 'down',
+      state: previous?.state ?? 'idle',
+      coins: previous?.coins ?? 0
     };
 
     this.players.set(socketId, player);
@@ -45,6 +53,7 @@ export class RoomManager {
 
     return {
       player,
+      leftRoomId,
       roomState: {
         roomId,
         selfId: socketId,
@@ -167,11 +176,32 @@ export class RoomManager {
     return trimmed.slice(0, 16);
   }
 
-  private spawnPosition(): { x: number; y: number } {
+  private spawnPosition(roomId: RoomId): { x: number; y: number } {
+    if (roomId.endsWith(':farm')) {
+      return {
+        x: 622 + Math.random() * 40,
+        y: 92 + Math.random() * 24
+      };
+    }
+
     return {
       x: 612 + Math.random() * 56,
       y: 500 + Math.random() * 72
     };
+  }
+
+  private leaveRoomMembership(socketId: string, roomId: RoomId | null): RoomId | null {
+    if (!roomId) {
+      return null;
+    }
+
+    const members = this.roomMembers.get(roomId);
+    members?.delete(socketId);
+    if (members && members.size === 0) {
+      this.roomMembers.delete(roomId);
+    }
+
+    return roomId;
   }
 
   private mapTargetToState(target: InteractPayload['target']): PlayerState {

@@ -1,0 +1,50 @@
+{
+  "testBaseUrl": "http://localhost:5175",
+  "pageErrorsA": [],
+  "pageErrorsB": [],
+  "severeConsoleA": [],
+  "severeConsoleB": [],
+  "joinA": {
+    "room": "lobby-1:lobby",
+    "online": 2
+  },
+  "joinB": {
+    "room": "lobby-1:lobby",
+    "online": 2
+  },
+  "coinBefore": "Coins 0",
+  "hintBeforeE": "Press E to interact with Sofa",
+  "coinAfterInteract": "Coins 1",
+  "aAfterFarm": {
+    "room": "lobby-1:farm",
+    "online": 1
+  },
+  "bWhileAInFarm": {
+    "room": "lobby-1:lobby",
+    "online": 1
+  },
+  "coinAfterFarm": "Coins 1",
+  "aAfterBothFarm": {
+    "room": "lobby-1:farm",
+    "online": 2
+  },
+  "bAfterBothFarm": {
+    "room": "lobby-1:farm",
+    "online": 2
+  },
+  "aAfterBLeave": {
+    "room": "lobby-1:farm",
+    "online": 1
+  },
+  "aBackLobby": {
+    "room": "lobby-1:lobby",
+    "online": 1
+  },
+  "coinAfterBackLobby": "Coins 1",
+  "chatAHasA": true,
+  "chatAHasB": true,
+  "chatAHasEmoji": true,
+  "moveChanged": true,
+  "smoothStep1": true,
+  "smoothStep2": true
+}

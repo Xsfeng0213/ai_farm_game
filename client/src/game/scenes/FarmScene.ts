@@ -1,8 +1,9 @@
-import Phaser from 'phaser';
+﻿import Phaser from 'phaser';
 import type { ChatMessagePayload, FacingDirection, InteractionStatePayload, MovePayload, PlayerSnapshot, RoomStatePayload } from '../../types/protocol';
 import { FARM_CONFIG } from '../config/farmConfig';
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
+import { farmRoomId } from '../network/roomIds';
 import { PlayerStateMachine } from '../state/PlayerStateMachine';
 import { InputSystem } from '../systems/InputSystem';
 import type { PlayerSkin } from '../types/playerSkin';
@@ -15,11 +16,12 @@ export class FarmScene extends Phaser.Scene {
   private readonly network: SharedSceneOptions['network'];
   private readonly ui: SharedSceneOptions['ui'];
   private readonly nickname: SharedSceneOptions['nickname'];
-  private readonly roomId: SharedSceneOptions['roomId'];
+  private readonly baseRoomId: SharedSceneOptions['roomId'];
 
   private readonly stateMachine = new PlayerStateMachine();
 
   private selfId = '';
+  private activeRoomId = '';
   private localPlayer: LocalPlayer | null = null;
   private readonly remotePlayers = new Map<string, RemotePlayer>();
   private readonly remoteSnapshots = new Map<string, PlayerSnapshot>();
@@ -30,6 +32,7 @@ export class FarmScene extends Phaser.Scene {
   private state: MovePayload['state'] = 'idle';
   private coins = 0;
   private selectedSkin: PlayerSkin = 'skin1';
+  private pendingTransition: SceneSessionData['local'] | null = null;
 
   private lastMoveSentAt = 0;
   private lastSentSignature = '';
@@ -40,11 +43,20 @@ export class FarmScene extends Phaser.Scene {
     this.network = options.network;
     this.ui = options.ui;
     this.nickname = options.nickname;
-    this.roomId = options.roomId;
+    this.baseRoomId = options.roomId;
   }
 
   create(data?: SceneStartPayload): void {
-    this.isTransitioning = false;
+    this.resetSceneState();
+
+    if (data?.session?.local) {
+      this.pendingTransition = data.session.local;
+      this.selectedSkin = data.session.local.skin;
+      this.direction = data.session.local.direction;
+      this.state = data.session.local.state;
+      this.coins = data.session.local.coins;
+    }
+
     this.buildWorld();
     this.createLocalPlayerAtSpawn();
     this.inputSystem = new InputSystem(this);
@@ -53,21 +65,15 @@ export class FarmScene extends Phaser.Scene {
     this.bindNetworkEvents();
     this.bindUiEvents();
     this.network.connect();
+    this.network.joinRoom({
+      roomId: this.networkRoomId(),
+      nickname: this.nickname
+    });
 
-    if (data?.session) {
-      this.restoreSession(data.session);
-      this.sendMoveIfNeeded(true);
-    } else {
-      this.network.joinRoom({
-        roomId: this.roomId,
-        nickname: this.nickname
-      });
-      this.syncRoomHud();
-      this.ui.updateCoins(this.coins);
-    }
-
+    this.ui.updateCoins(this.coins);
     this.ui.showHint('Farm ready. Move to the north gate to return lobby');
     this.ui.appendChat('[system] Entered farm map');
+    this.syncRoomHud();
     this.cameras.main.fadeIn(240, 0, 0, 0);
   }
 
@@ -86,6 +92,25 @@ export class FarmScene extends Phaser.Scene {
     this.checkLobbyGate();
   }
 
+  private resetSceneState(): void {
+    this.isTransitioning = false;
+    this.selfId = '';
+    this.activeRoomId = this.networkRoomId();
+    this.lastMoveSentAt = 0;
+    this.lastSentSignature = '';
+    this.direction = 'down';
+    this.state = 'idle';
+    this.inputSystem = null;
+
+    this.localPlayer = null;
+    this.remotePlayers.clear();
+    this.remoteSnapshots.clear();
+  }
+
+  private networkRoomId(): string {
+    return farmRoomId(this.baseRoomId);
+  }
+
   private buildWorld(): void {
     this.cameras.main.setBounds(0, 0, FARM_CONFIG.mapWidth, FARM_CONFIG.mapHeight);
     this.physics.world.setBounds(0, 0, FARM_CONFIG.mapWidth, FARM_CONFIG.mapHeight);
@@ -93,14 +118,11 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private createLocalPlayerAtSpawn(): void {
-    if (this.localPlayer) {
-      return;
-    }
-
-    this.localPlayer = new LocalPlayer(this, FARM_CONFIG.spawn.x, FARM_CONFIG.spawn.y, this.nickname);
+    const spawn = this.pendingTransition?.position ?? FARM_CONFIG.spawn;
+    this.localPlayer = new LocalPlayer(this, spawn.x, spawn.y, this.nickname);
     this.localPlayer.setSkin(this.selectedSkin);
-    this.direction = 'down';
-    this.state = this.stateMachine.reset('idle', Date.now());
+    this.state = this.stateMachine.reset(this.pendingTransition?.state ?? 'idle', Date.now());
+    this.direction = this.pendingTransition?.direction ?? 'down';
     this.localPlayer.setVisualState(this.direction, this.state);
     this.cameras.main.startFollow(this.localPlayer, true, 0.12, 0.12);
   }
@@ -188,6 +210,7 @@ export class FarmScene extends Phaser.Scene {
 
   private handleRoomState(payload: RoomStatePayload): void {
     this.selfId = payload.selfId;
+    this.activeRoomId = payload.roomId;
 
     const existingIds = new Set<string>();
 
@@ -213,6 +236,16 @@ export class FarmScene extends Phaser.Scene {
         this.remoteSnapshots.delete(id);
       }
     });
+
+    if (this.pendingTransition && this.localPlayer) {
+      this.localPlayer.setSkin(this.pendingTransition.skin);
+      this.localPlayer.setPosition(this.pendingTransition.position.x, this.pendingTransition.position.y);
+      this.direction = this.pendingTransition.direction;
+      this.state = this.stateMachine.reset(this.pendingTransition.state, Date.now());
+      this.localPlayer.setVisualState(this.direction, this.state);
+      this.sendMoveIfNeeded(true);
+      this.pendingTransition = null;
+    }
 
     this.syncRoomHud();
   }
@@ -357,31 +390,12 @@ export class FarmScene extends Phaser.Scene {
 
   private syncRoomHud(): void {
     const online = this.localPlayer ? this.remotePlayers.size + 1 : this.remotePlayers.size;
-    this.ui.updateRoom(this.roomId, online);
+    this.ui.updateRoom(this.activeRoomId, online);
   }
 
   private buildSessionData(nextPosition: { x: number; y: number }): SceneSessionData {
-    const remotes: PlayerSnapshot[] = [];
-
-    this.remotePlayers.forEach((remote, id) => {
-      const snapshot = this.remoteSnapshots.get(id);
-      if (snapshot) {
-        remotes.push({
-          ...snapshot,
-          roomId: this.roomId,
-          nickname: remote.getNickname(),
-          position: {
-            x: remote.x,
-            y: remote.y
-          },
-          direction: remote.getDirection(),
-          state: remote.getState()
-        });
-      }
-    });
-
     return {
-      roomId: this.roomId,
+      roomId: this.baseRoomId,
       selfId: this.selfId,
       local: {
         id: this.selfId,
@@ -392,34 +406,7 @@ export class FarmScene extends Phaser.Scene {
         coins: this.coins,
         skin: this.selectedSkin
       },
-      remotes
+      remotes: []
     };
-  }
-
-  private restoreSession(session: SceneSessionData): void {
-    this.selfId = session.selfId;
-    this.coins = session.local.coins;
-    this.direction = session.local.direction;
-    this.state = this.stateMachine.reset(session.local.state, Date.now());
-    this.selectedSkin = session.local.skin;
-
-    if (this.localPlayer) {
-      this.localPlayer.setNickname(session.local.nickname);
-      this.localPlayer.setSkin(session.local.skin);
-      this.localPlayer.setPosition(session.local.position.x, session.local.position.y);
-      this.localPlayer.setVisualState(this.direction, this.state);
-    }
-
-    this.remotePlayers.forEach((player) => player.destroy());
-    this.remotePlayers.clear();
-    this.remoteSnapshots.clear();
-
-    session.remotes.forEach((player) => {
-      this.remoteSnapshots.set(player.id, { ...player });
-      this.createOrSyncRemote(player);
-    });
-
-    this.syncRoomHud();
-    this.ui.updateCoins(this.coins);
   }
 }
