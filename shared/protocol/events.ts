@@ -1,3 +1,5 @@
+import type { FarmPlotId } from './farmPlots';
+
 export type RoomId = string;
 export type PlayerId = string;
 
@@ -80,6 +82,34 @@ export interface InteractionStatePayload {
   serverTime: number;
 }
 
+export type FarmPlotState = 'empty' | 'planted' | 'harvestable';
+
+export interface FarmPlotSnapshot {
+  id: FarmPlotId;
+  state: FarmPlotState;
+  plantedBy?: PlayerId;
+  readyAt?: number;
+  updatedAt: number;
+}
+
+export interface FarmStatePayload {
+  roomId: RoomId;
+  plots: FarmPlotSnapshot[];
+}
+
+export interface FarmInteractPayload {
+  plotId: FarmPlotId;
+}
+
+export interface FarmPlotUpdatedPayload {
+  roomId: RoomId;
+  plot: FarmPlotSnapshot;
+  action: 'planted' | 'grown' | 'harvested';
+  actorId?: PlayerId;
+  actorCoins?: number;
+  serverTime: number;
+}
+
 export interface ServerToClientEvents {
   room_state: (payload: RoomStatePayload) => void;
   player_joined: (player: PlayerSnapshot) => void;
@@ -87,6 +117,8 @@ export interface ServerToClientEvents {
   player_moved: (payload: PlayerMovedPayload) => void;
   chat_message: (payload: ChatMessagePayload) => void;
   interaction_state: (payload: InteractionStatePayload) => void;
+  farm_state: (payload: FarmStatePayload) => void;
+  farm_plot_updated: (payload: FarmPlotUpdatedPayload) => void;
 }
 
 export interface ClientToServerEvents {
@@ -94,5 +126,6 @@ export interface ClientToServerEvents {
   move: (payload: MovePayload) => void;
   chat: (payload: ChatPayload) => void;
   interact: (payload: InteractPayload) => void;
+  farm_interact: (payload: FarmInteractPayload) => void;
   ping: (payload: { clientTime: number }) => void;
 }

@@ -1,0 +1,35 @@
+{
+  "baseUrl": "http://localhost:5176",
+  "pageErrorsA": [],
+  "pageErrorsB": [],
+  "consoleErrorsA": [],
+  "consoleErrorsB": [],
+  "joinA": {
+    "room": "lobby-1:lobby",
+    "online": 2
+  },
+  "joinB": {
+    "room": "lobby-1:lobby",
+    "online": 2
+  },
+  "farmA": {
+    "room": "lobby-1:farm",
+    "online": 2
+  },
+  "farmB": {
+    "room": "lobby-1:farm",
+    "online": 2
+  },
+  "coinA0": "Coins 0",
+  "coinB0": "Coins 0",
+  "hintAPlant": "Press E to plant on West Plot 2",
+  "hintBAfterPlant": "West Plot 2 is growing...",
+  "hintAHarvest": "Press E to harvest West Plot 2",
+  "hintBHarvest": "Press E to harvest West Plot 2",
+  "coinBAfterHarvest": "Coins 2",
+  "coinAAfterHarvest": "Coins 0",
+  "hintAAfterHarvest": "Press E to plant on West Plot 2",
+  "hintBAfterHarvest": "Press E to plant on West Plot 2",
+  "coinBAfterRepress": "Coins 2",
+  "doubleHarvestPrevented": true
+}

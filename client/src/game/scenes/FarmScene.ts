@@ -1,16 +1,28 @@
 ﻿import Phaser from 'phaser';
-import type { ChatMessagePayload, FacingDirection, InteractionStatePayload, MovePayload, PlayerSnapshot, RoomStatePayload } from '../../types/protocol';
+import type {
+  ChatMessagePayload,
+  FacingDirection,
+  FarmPlotUpdatedPayload,
+  FarmStatePayload,
+  InteractionStatePayload,
+  MovePayload,
+  PlayerSnapshot,
+  RoomStatePayload
+} from '../../types/protocol';
 import { FARM_CONFIG } from '../config/farmConfig';
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { farmRoomId } from '../network/roomIds';
 import { PlayerStateMachine } from '../state/PlayerStateMachine';
+import { FarmPlotSystem } from '../systems/FarmPlotSystem';
 import { InputSystem } from '../systems/InputSystem';
 import type { PlayerSkin } from '../types/playerSkin';
 import type { SceneSessionData, SceneStartPayload } from '../types/sceneSession';
 import { buildFarmMap } from '../world/FarmMapBuilder';
 import { SCENE_KEYS } from './SceneKeys';
 import type { SharedSceneOptions } from './SceneOptions';
+
+const FARM_ACTION_COOLDOWN_MS = 220;
 
 export class FarmScene extends Phaser.Scene {
   private readonly network: SharedSceneOptions['network'];
@@ -27,6 +39,8 @@ export class FarmScene extends Phaser.Scene {
   private readonly remoteSnapshots = new Map<string, PlayerSnapshot>();
 
   private inputSystem: InputSystem | null = null;
+  private farmPlotSystem: FarmPlotSystem | null = null;
+  private interactKey: Phaser.Input.Keyboard.Key | null = null;
 
   private direction: FacingDirection = 'down';
   private state: MovePayload['state'] = 'idle';
@@ -37,6 +51,7 @@ export class FarmScene extends Phaser.Scene {
   private lastMoveSentAt = 0;
   private lastSentSignature = '';
   private isTransitioning = false;
+  private lastFarmActionAt = 0;
 
   constructor(options: SharedSceneOptions) {
     super(SCENE_KEYS.farm);
@@ -60,6 +75,8 @@ export class FarmScene extends Phaser.Scene {
     this.buildWorld();
     this.createLocalPlayerAtSpawn();
     this.inputSystem = new InputSystem(this);
+    this.farmPlotSystem = new FarmPlotSystem(this);
+    this.interactKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.E) ?? null;
 
     this.network.offAll();
     this.bindNetworkEvents();
@@ -71,7 +88,7 @@ export class FarmScene extends Phaser.Scene {
     });
 
     this.ui.updateCoins(this.coins);
-    this.ui.showHint('Farm ready. Move to the north gate to return lobby');
+    this.ui.showHint('Farm ready. Press E near field to plant/harvest');
     this.ui.appendChat('[system] Entered farm map');
     this.syncRoomHud();
     this.cameras.main.fadeIn(240, 0, 0, 0);
@@ -89,6 +106,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.updateLocalMovement(delta, now);
     this.updateRemotePlayers(delta);
+    this.updateFarmInteractionPrompt(now);
     this.checkLobbyGate();
   }
 
@@ -98,9 +116,12 @@ export class FarmScene extends Phaser.Scene {
     this.activeRoomId = this.networkRoomId();
     this.lastMoveSentAt = 0;
     this.lastSentSignature = '';
+    this.lastFarmActionAt = 0;
     this.direction = 'down';
     this.state = 'idle';
     this.inputSystem = null;
+    this.farmPlotSystem = null;
+    this.interactKey = null;
 
     this.localPlayer = null;
     this.remotePlayers.clear();
@@ -188,6 +209,31 @@ export class FarmScene extends Phaser.Scene {
         if (remote) {
           remote.setVisualState(remote.getDirection(), payload.state);
         }
+      }
+    });
+
+    this.network.onFarmState((payload: FarmStatePayload) => {
+      if (payload.roomId !== this.activeRoomId) {
+        return;
+      }
+
+      this.farmPlotSystem?.applyFullState(payload.plots);
+    });
+
+    this.network.onFarmPlotUpdated((payload: FarmPlotUpdatedPayload) => {
+      if (payload.roomId !== this.activeRoomId) {
+        return;
+      }
+
+      this.farmPlotSystem?.applyPlotUpdate(payload.plot);
+
+      if (payload.actorId === this.selfId && typeof payload.actorCoins === 'number') {
+        this.coins = payload.actorCoins;
+        this.ui.updateCoins(this.coins);
+      }
+
+      if (payload.action === 'harvested') {
+        this.ui.appendChat('[system] A crop was harvested');
       }
     });
   }
@@ -305,6 +351,39 @@ export class FarmScene extends Phaser.Scene {
     this.remotePlayers.forEach((player) => {
       player.tick(delta);
     });
+  }
+
+  private updateFarmInteractionPrompt(now: number): void {
+    if (!this.localPlayer || !this.farmPlotSystem || this.isTransitioning) {
+      return;
+    }
+
+    const candidate = this.farmPlotSystem.findCandidate(new Phaser.Math.Vector2(this.localPlayer.x, this.localPlayer.y));
+    if (!candidate) {
+      this.ui.showHint('Farm ready. Press E near field to plant/harvest');
+      return;
+    }
+
+    if (candidate.action === 'plant') {
+      this.ui.showHint(`Press E to plant on ${candidate.label}`);
+    } else if (candidate.action === 'harvest') {
+      this.ui.showHint(`Press E to harvest ${candidate.label}`);
+    } else {
+      this.ui.showHint(`${candidate.label} is growing...`);
+    }
+
+    if (
+      candidate.action &&
+      this.interactKey &&
+      Phaser.Input.Keyboard.JustDown(this.interactKey) &&
+      now - this.lastFarmActionAt > FARM_ACTION_COOLDOWN_MS
+    ) {
+      this.lastFarmActionAt = now;
+      this.network.sendFarmInteract({ plotId: candidate.plotId });
+      this.state = 'interacting';
+      this.localPlayer.setVisualState(this.direction, this.state);
+      this.sendMoveIfNeeded(true);
+    }
   }
 
   private checkLobbyGate(): void {

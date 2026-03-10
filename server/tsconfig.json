@@ -1,4 +1,4 @@
-{
+﻿{
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -12,5 +12,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["src", "../shared/protocol/events.ts"]
+  "include": ["src", "../shared/protocol/**/*.ts"]
 }
+

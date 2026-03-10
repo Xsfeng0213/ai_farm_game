@@ -2,6 +2,7 @@ import { io, type Socket } from 'socket.io-client';
 import type {
   ChatPayload,
   ClientToServerEvents,
+  FarmInteractPayload,
   InteractPayload,
   JoinRoomPayload,
   MovePayload,
@@ -44,6 +45,10 @@ export class NetworkClient {
     this.socket.emit('interact', payload);
   }
 
+  sendFarmInteract(payload: FarmInteractPayload): void {
+    this.socket.emit('farm_interact', payload);
+  }
+
   onRoomState(handler: ServerToClientEvents['room_state']): void {
     this.socket.on('room_state', handler);
   }
@@ -66,6 +71,14 @@ export class NetworkClient {
 
   onInteractionState(handler: ServerToClientEvents['interaction_state']): void {
     this.socket.on('interaction_state', handler);
+  }
+
+  onFarmState(handler: ServerToClientEvents['farm_state']): void {
+    this.socket.on('farm_state', handler);
+  }
+
+  onFarmPlotUpdated(handler: ServerToClientEvents['farm_plot_updated']): void {
+    this.socket.on('farm_plot_updated', handler);
   }
 
   offAll(): void {

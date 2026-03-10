@@ -1,6 +1,10 @@
-import type {
+﻿import type {
   ChatMessagePayload,
   ChatPayload,
+  FarmInteractPayload,
+  FarmPlotSnapshot,
+  FarmPlotUpdatedPayload,
+  FarmStatePayload,
   InteractPayload,
   InteractionStatePayload,
   JoinRoomPayload,
@@ -11,10 +15,13 @@ import type {
   RoomId,
   RoomStatePayload
 } from '../../../shared/protocol/events';
+import { FARM_GROWTH_MS, FARM_HARVEST_COINS, FARM_PLOT_IDS } from '../../../shared/protocol/farmPlots';
 
 interface PlayerRecord extends PlayerSnapshot {
   socketId: string;
 }
+
+interface FarmPlotRecord extends FarmPlotSnapshot {}
 
 const ROOM_FALLBACK: RoomId = 'lobby-1';
 const MAX_MESSAGE_LENGTH = 120;
@@ -22,6 +29,7 @@ const MAX_MESSAGE_LENGTH = 120;
 export class RoomManager {
   private readonly players = new Map<string, PlayerRecord>();
   private readonly roomMembers = new Map<RoomId, Set<string>>();
+  private readonly farmPlotsByRoom = new Map<RoomId, Map<FarmPlotSnapshot['id'], FarmPlotRecord>>();
 
   join(socketId: string, payload: JoinRoomPayload): {
     roomState: RoomStatePayload;
@@ -50,6 +58,10 @@ export class RoomManager {
       this.roomMembers.set(roomId, new Set());
     }
     this.roomMembers.get(roomId)?.add(socketId);
+
+    if (this.isFarmRoom(roomId)) {
+      this.ensureFarmRoom(roomId);
+    }
 
     return {
       player,
@@ -146,8 +158,121 @@ export class RoomManager {
     };
   }
 
+  getFarmState(roomId: RoomId): FarmStatePayload | null {
+    if (!this.isFarmRoom(roomId)) {
+      return null;
+    }
+
+    const plots = this.ensureFarmRoom(roomId);
+    return {
+      roomId,
+      plots: Array.from(plots.values()).map((plot) => ({ ...plot }))
+    };
+  }
+
+  farmInteract(socketId: string, payload: FarmInteractPayload): FarmPlotUpdatedPayload | null {
+    const player = this.players.get(socketId);
+    if (!player || !this.isFarmRoom(player.roomId)) {
+      return null;
+    }
+
+    const plots = this.ensureFarmRoom(player.roomId);
+    const plot = plots.get(payload.plotId);
+    if (!plot) {
+      return null;
+    }
+
+    const now = Date.now();
+    if (plot.state === 'planted' && plot.readyAt && now >= plot.readyAt) {
+      plot.state = 'harvestable';
+      plot.updatedAt = now;
+      plot.readyAt = undefined;
+    }
+
+    if (plot.state === 'empty') {
+      plot.state = 'planted';
+      plot.plantedBy = player.id;
+      plot.readyAt = now + FARM_GROWTH_MS;
+      plot.updatedAt = now;
+
+      return {
+        roomId: player.roomId,
+        plot: { ...plot },
+        action: 'planted',
+        actorId: player.id,
+        actorCoins: player.coins,
+        serverTime: now
+      };
+    }
+
+    if (plot.state !== 'harvestable') {
+      return null;
+    }
+
+    plot.state = 'empty';
+    plot.plantedBy = undefined;
+    plot.readyAt = undefined;
+    plot.updatedAt = now;
+    player.coins += FARM_HARVEST_COINS;
+
+    return {
+      roomId: player.roomId,
+      plot: { ...plot },
+      action: 'harvested',
+      actorId: player.id,
+      actorCoins: player.coins,
+      serverTime: now
+    };
+  }
+
+  collectFarmGrowthUpdates(now: number): FarmPlotUpdatedPayload[] {
+    const updates: FarmPlotUpdatedPayload[] = [];
+
+    this.farmPlotsByRoom.forEach((plots, roomId) => {
+      plots.forEach((plot) => {
+        if (plot.state !== 'planted' || !plot.readyAt || now < plot.readyAt) {
+          return;
+        }
+
+        plot.state = 'harvestable';
+        plot.readyAt = undefined;
+        plot.updatedAt = now;
+
+        updates.push({
+          roomId,
+          plot: { ...plot },
+          action: 'grown',
+          serverTime: now
+        });
+      });
+    });
+
+    return updates;
+  }
+
   getPlayer(socketId: string): PlayerSnapshot | null {
     return this.players.get(socketId) ?? null;
+  }
+
+  private ensureFarmRoom(roomId: RoomId): Map<FarmPlotSnapshot['id'], FarmPlotRecord> {
+    const existing = this.farmPlotsByRoom.get(roomId);
+    if (existing) {
+      return existing;
+    }
+
+    const now = Date.now();
+    const plots = new Map<FarmPlotSnapshot['id'], FarmPlotRecord>();
+
+    FARM_PLOT_IDS.forEach((id) => {
+      plots.set(id, {
+        id,
+        state: 'empty',
+        updatedAt: now
+      });
+    });
+
+    this.farmPlotsByRoom.set(roomId, plots);
+    return plots;
   }
 
   private getRoomPlayers(roomId: RoomId): PlayerSnapshot[] {
@@ -214,5 +339,9 @@ export class RoomManager {
     }
 
     return 'resting';
+  }
+
+  private isFarmRoom(roomId: RoomId): boolean {
+    return roomId.endsWith(':farm');
   }
 }
