@@ -1,0 +1,425 @@
+import Phaser from 'phaser';
+import type { ChatMessagePayload, FacingDirection, InteractionStatePayload, MovePayload, PlayerSnapshot, RoomStatePayload } from '../../types/protocol';
+import { FARM_CONFIG } from '../config/farmConfig';
+import { LocalPlayer } from '../entities/LocalPlayer';
+import { RemotePlayer } from '../entities/RemotePlayer';
+import { PlayerStateMachine } from '../state/PlayerStateMachine';
+import { InputSystem } from '../systems/InputSystem';
+import type { PlayerSkin } from '../types/playerSkin';
+import type { SceneSessionData, SceneStartPayload } from '../types/sceneSession';
+import { buildFarmMap } from '../world/FarmMapBuilder';
+import { SCENE_KEYS } from './SceneKeys';
+import type { SharedSceneOptions } from './SceneOptions';
+
+export class FarmScene extends Phaser.Scene {
+  private readonly network: SharedSceneOptions['network'];
+  private readonly ui: SharedSceneOptions['ui'];
+  private readonly nickname: SharedSceneOptions['nickname'];
+  private readonly roomId: SharedSceneOptions['roomId'];
+
+  private readonly stateMachine = new PlayerStateMachine();
+
+  private selfId = '';
+  private localPlayer: LocalPlayer | null = null;
+  private readonly remotePlayers = new Map<string, RemotePlayer>();
+  private readonly remoteSnapshots = new Map<string, PlayerSnapshot>();
+
+  private inputSystem: InputSystem | null = null;
+
+  private direction: FacingDirection = 'down';
+  private state: MovePayload['state'] = 'idle';
+  private coins = 0;
+  private selectedSkin: PlayerSkin = 'skin1';
+
+  private lastMoveSentAt = 0;
+  private lastSentSignature = '';
+  private isTransitioning = false;
+
+  constructor(options: SharedSceneOptions) {
+    super(SCENE_KEYS.farm);
+    this.network = options.network;
+    this.ui = options.ui;
+    this.nickname = options.nickname;
+    this.roomId = options.roomId;
+  }
+
+  create(data?: SceneStartPayload): void {
+    this.isTransitioning = false;
+    this.buildWorld();
+    this.createLocalPlayerAtSpawn();
+    this.inputSystem = new InputSystem(this);
+
+    this.network.offAll();
+    this.bindNetworkEvents();
+    this.bindUiEvents();
+    this.network.connect();
+
+    if (data?.session) {
+      this.restoreSession(data.session);
+      this.sendMoveIfNeeded(true);
+    } else {
+      this.network.joinRoom({
+        roomId: this.roomId,
+        nickname: this.nickname
+      });
+      this.syncRoomHud();
+      this.ui.updateCoins(this.coins);
+    }
+
+    this.ui.showHint('Farm ready. Move to the north gate to return lobby');
+    this.ui.appendChat('[system] Entered farm map');
+    this.cameras.main.fadeIn(240, 0, 0, 0);
+  }
+
+  update(_time: number, delta: number): void {
+    const now = Date.now();
+
+    const stepped = this.stateMachine.tick(now);
+    if (stepped !== this.state) {
+      this.state = stepped;
+      this.localPlayer?.setVisualState(this.direction, this.state);
+      this.sendMoveIfNeeded(true);
+    }
+
+    this.updateLocalMovement(delta, now);
+    this.updateRemotePlayers(delta);
+    this.checkLobbyGate();
+  }
+
+  private buildWorld(): void {
+    this.cameras.main.setBounds(0, 0, FARM_CONFIG.mapWidth, FARM_CONFIG.mapHeight);
+    this.physics.world.setBounds(0, 0, FARM_CONFIG.mapWidth, FARM_CONFIG.mapHeight);
+    buildFarmMap(this);
+  }
+
+  private createLocalPlayerAtSpawn(): void {
+    if (this.localPlayer) {
+      return;
+    }
+
+    this.localPlayer = new LocalPlayer(this, FARM_CONFIG.spawn.x, FARM_CONFIG.spawn.y, this.nickname);
+    this.localPlayer.setSkin(this.selectedSkin);
+    this.direction = 'down';
+    this.state = this.stateMachine.reset('idle', Date.now());
+    this.localPlayer.setVisualState(this.direction, this.state);
+    this.cameras.main.startFollow(this.localPlayer, true, 0.12, 0.12);
+  }
+
+  private bindNetworkEvents(): void {
+    this.network.onRoomState((payload: RoomStatePayload) => {
+      this.handleRoomState(payload);
+    });
+
+    this.network.onPlayerJoined((player: PlayerSnapshot) => {
+      if (player.id === this.selfId) {
+        return;
+      }
+
+      this.createOrSyncRemote(player);
+      this.remoteSnapshots.set(player.id, { ...player });
+      this.syncRoomHud();
+      this.ui.appendChat(`[system] ${player.nickname} joined`);
+    });
+
+    this.network.onPlayerLeft(({ id }: { id: string }) => {
+      const remote = this.remotePlayers.get(id);
+      if (remote) {
+        remote.destroy();
+        this.remotePlayers.delete(id);
+      }
+
+      this.remoteSnapshots.delete(id);
+      this.syncRoomHud();
+    });
+
+    this.network.onPlayerMoved((payload) => {
+      if (payload.id === this.selfId) {
+        return;
+      }
+
+      const remote = this.remotePlayers.get(payload.id);
+      remote?.syncMove(payload);
+
+      const current = this.remoteSnapshots.get(payload.id);
+      if (current) {
+        this.remoteSnapshots.set(payload.id, {
+          ...current,
+          position: payload.position,
+          direction: payload.direction,
+          state: payload.state
+        });
+      }
+    });
+
+    this.network.onChatMessage((payload: ChatMessagePayload) => {
+      this.handleChatMessage(payload);
+    });
+
+    this.network.onInteractionState((payload: InteractionStatePayload) => {
+      if (payload.playerId === this.selfId) {
+        this.coins = payload.coins;
+        this.ui.updateCoins(this.coins);
+        this.state = this.stateMachine.syncFromServer(payload.state, Date.now());
+        this.localPlayer?.setVisualState(this.direction, this.state);
+      } else {
+        const remote = this.remotePlayers.get(payload.playerId);
+        if (remote) {
+          remote.setVisualState(remote.getDirection(), payload.state);
+        }
+      }
+    });
+  }
+
+  private bindUiEvents(): void {
+    this.ui.onSend((message) => {
+      this.network.sendChat({ message });
+    });
+
+    this.ui.onEmoji((emoji) => {
+      this.network.sendChat({ message: '', emoji });
+    });
+
+    this.ui.onSkinChange((skin) => {
+      this.selectedSkin = skin;
+      this.localPlayer?.setSkin(skin);
+      this.ui.showHint(`Skin switched: ${skin}`);
+    });
+  }
+
+  private handleRoomState(payload: RoomStatePayload): void {
+    this.selfId = payload.selfId;
+
+    const existingIds = new Set<string>();
+
+    payload.players.forEach((player) => {
+      existingIds.add(player.id);
+      if (player.id === payload.selfId) {
+        this.createOrSyncLocal(player);
+      } else {
+        this.createOrSyncRemote(player);
+        this.remoteSnapshots.set(player.id, { ...player });
+      }
+    });
+
+    this.remotePlayers.forEach((player, id) => {
+      if (!existingIds.has(id)) {
+        player.destroy();
+        this.remotePlayers.delete(id);
+      }
+    });
+
+    this.remoteSnapshots.forEach((_player, id) => {
+      if (!existingIds.has(id)) {
+        this.remoteSnapshots.delete(id);
+      }
+    });
+
+    this.syncRoomHud();
+  }
+
+  private createOrSyncLocal(player: PlayerSnapshot): void {
+    if (!this.localPlayer) {
+      this.localPlayer = new LocalPlayer(this, player.position.x, player.position.y, player.nickname);
+      this.cameras.main.startFollow(this.localPlayer, true, 0.12, 0.12);
+    } else {
+      this.localPlayer.setPosition(player.position.x, player.position.y);
+      this.localPlayer.setNickname(player.nickname);
+    }
+
+    this.localPlayer.setSkin(this.selectedSkin);
+    this.direction = player.direction;
+    this.state = this.stateMachine.reset(player.state, Date.now());
+    this.coins = player.coins;
+    this.localPlayer.setVisualState(this.direction, this.state);
+    this.ui.updateCoins(this.coins);
+  }
+
+  private createOrSyncRemote(player: PlayerSnapshot): void {
+    const existing = this.remotePlayers.get(player.id);
+    if (existing) {
+      existing.syncFromSnapshot(player);
+      return;
+    }
+
+    this.remotePlayers.set(player.id, new RemotePlayer(this, player));
+  }
+
+  private updateLocalMovement(delta: number, now: number): void {
+    if (!this.localPlayer || !this.inputSystem || this.isTransitioning) {
+      return;
+    }
+
+    const input = this.inputSystem.read(FARM_CONFIG.playerSpeed, this.direction);
+    const locked = this.stateMachine.isMovementLocked(now);
+    const velocityX = locked ? 0 : input.velocityX;
+    const velocityY = locked ? 0 : input.velocityY;
+
+    this.direction = input.direction;
+    this.state = this.stateMachine.setMovement(!locked && input.state === 'walking', now);
+    this.localPlayer.applyMovement(
+      velocityX,
+      velocityY,
+      delta,
+      FARM_CONFIG.worldBounds,
+      this.direction,
+      this.state
+    );
+
+    this.sendMoveIfNeeded();
+  }
+
+  private updateRemotePlayers(delta: number): void {
+    this.remotePlayers.forEach((player) => {
+      player.tick(delta);
+    });
+  }
+
+  private checkLobbyGate(): void {
+    if (!this.localPlayer || this.isTransitioning) {
+      return;
+    }
+
+    const withinGateX =
+      this.localPlayer.x >= FARM_CONFIG.gateToLobby.minX && this.localPlayer.x <= FARM_CONFIG.gateToLobby.maxX;
+    const crossedGate = this.localPlayer.y <= FARM_CONFIG.gateToLobby.triggerY;
+
+    if (withinGateX && crossedGate) {
+      this.transitionBackToLobby();
+    }
+  }
+
+  private transitionBackToLobby(): void {
+    if (this.isTransitioning) {
+      return;
+    }
+
+    this.isTransitioning = true;
+    this.ui.showHint('Returning to lobby...');
+    this.state = this.stateMachine.reset('idle', Date.now());
+    this.localPlayer?.setVisualState(this.direction, this.state);
+
+    this.cameras.main.fadeOut(360, 8, 10, 16);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.start(SCENE_KEYS.lobby, {
+        session: this.buildSessionData({ x: 640, y: 742 })
+      });
+    });
+  }
+
+  private handleChatMessage(payload: ChatMessagePayload): void {
+    const message = payload.message ? payload.message : '';
+    const emoji = payload.emoji ? ` ${payload.emoji}` : '';
+    const bubbleText = `${message}${emoji}`.trim();
+
+    this.ui.appendChat(`${payload.nickname}: ${message}${emoji}`.trim());
+
+    if (!bubbleText) {
+      return;
+    }
+
+    if (payload.playerId === this.selfId) {
+      this.localPlayer?.showChatBubble(bubbleText);
+      return;
+    }
+
+    this.remotePlayers.get(payload.playerId)?.showChatBubble(bubbleText);
+  }
+
+  private sendMoveIfNeeded(force = false): void {
+    if (!this.localPlayer) {
+      return;
+    }
+
+    const now = Date.now();
+    if (!force && now - this.lastMoveSentAt < FARM_CONFIG.moveIntervalMs) {
+      return;
+    }
+
+    const payload: MovePayload = {
+      position: {
+        x: this.localPlayer.x,
+        y: this.localPlayer.y
+      },
+      direction: this.direction,
+      state: this.state,
+      clientTime: now
+    };
+
+    const signature = `${payload.position.x.toFixed(1)}|${payload.position.y.toFixed(1)}|${payload.direction}|${payload.state}`;
+    if (!force && signature === this.lastSentSignature) {
+      return;
+    }
+
+    this.network.sendMove(payload);
+    this.lastMoveSentAt = now;
+    this.lastSentSignature = signature;
+  }
+
+  private syncRoomHud(): void {
+    const online = this.localPlayer ? this.remotePlayers.size + 1 : this.remotePlayers.size;
+    this.ui.updateRoom(this.roomId, online);
+  }
+
+  private buildSessionData(nextPosition: { x: number; y: number }): SceneSessionData {
+    const remotes: PlayerSnapshot[] = [];
+
+    this.remotePlayers.forEach((remote, id) => {
+      const snapshot = this.remoteSnapshots.get(id);
+      if (snapshot) {
+        remotes.push({
+          ...snapshot,
+          roomId: this.roomId,
+          nickname: remote.getNickname(),
+          position: {
+            x: remote.x,
+            y: remote.y
+          },
+          direction: remote.getDirection(),
+          state: remote.getState()
+        });
+      }
+    });
+
+    return {
+      roomId: this.roomId,
+      selfId: this.selfId,
+      local: {
+        id: this.selfId,
+        nickname: this.nickname,
+        position: nextPosition,
+        direction: 'down',
+        state: 'idle',
+        coins: this.coins,
+        skin: this.selectedSkin
+      },
+      remotes
+    };
+  }
+
+  private restoreSession(session: SceneSessionData): void {
+    this.selfId = session.selfId;
+    this.coins = session.local.coins;
+    this.direction = session.local.direction;
+    this.state = this.stateMachine.reset(session.local.state, Date.now());
+    this.selectedSkin = session.local.skin;
+
+    if (this.localPlayer) {
+      this.localPlayer.setNickname(session.local.nickname);
+      this.localPlayer.setSkin(session.local.skin);
+      this.localPlayer.setPosition(session.local.position.x, session.local.position.y);
+      this.localPlayer.setVisualState(this.direction, this.state);
+    }
+
+    this.remotePlayers.forEach((player) => player.destroy());
+    this.remotePlayers.clear();
+    this.remoteSnapshots.clear();
+
+    session.remotes.forEach((player) => {
+      this.remoteSnapshots.set(player.id, { ...player });
+      this.createOrSyncRemote(player);
+    });
+
+    this.syncRoomHud();
+    this.ui.updateCoins(this.coins);
+  }
+}

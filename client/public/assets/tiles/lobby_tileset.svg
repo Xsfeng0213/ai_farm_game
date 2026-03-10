@@ -1,0 +1,100 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="160" height="16" viewBox="0 0 160 16" shape-rendering="crispEdges">
+  <rect width="160" height="16" fill="#000"/>
+
+  <!-- 0: floor warm -->
+  <g transform="translate(0,0)">
+    <rect width="16" height="16" fill="#3f4f68"/>
+    <rect x="1" y="1" width="2" height="2" fill="#4e607d"/>
+    <rect x="6" y="3" width="1" height="1" fill="#2f3b4e"/>
+    <rect x="11" y="2" width="2" height="2" fill="#4a5d77"/>
+    <rect x="4" y="9" width="2" height="2" fill="#506581"/>
+    <rect x="13" y="10" width="1" height="1" fill="#2c3646"/>
+    <rect x="8" y="13" width="2" height="1" fill="#556b87"/>
+  </g>
+
+  <!-- 1: floor cool -->
+  <g transform="translate(16,0)">
+    <rect width="16" height="16" fill="#34455c"/>
+    <rect x="2" y="2" width="2" height="2" fill="#3e536f"/>
+    <rect x="8" y="1" width="1" height="1" fill="#263547"/>
+    <rect x="12" y="4" width="2" height="1" fill="#415a77"/>
+    <rect x="4" y="8" width="1" height="2" fill="#253245"/>
+    <rect x="9" y="10" width="2" height="2" fill="#3c516d"/>
+    <rect x="13" y="13" width="1" height="1" fill="#4a617d"/>
+  </g>
+
+  <!-- 2: wall -->
+  <g transform="translate(32,0)">
+    <rect width="16" height="16" fill="#6e5b50"/>
+    <rect y="0" width="16" height="2" fill="#8a7567"/>
+    <rect y="14" width="16" height="2" fill="#51433b"/>
+    <rect x="2" y="4" width="4" height="2" fill="#7d685b"/>
+    <rect x="9" y="4" width="5" height="2" fill="#7a6558"/>
+    <rect x="1" y="8" width="6" height="2" fill="#7f6a5d"/>
+    <rect x="8" y="8" width="7" height="2" fill="#795f53"/>
+  </g>
+
+  <!-- 3: shadow wall -->
+  <g transform="translate(48,0)">
+    <rect width="16" height="16" fill="#54453e"/>
+    <rect y="0" width="16" height="2" fill="#6a5750"/>
+    <rect y="14" width="16" height="2" fill="#3f332e"/>
+    <rect x="1" y="4" width="5" height="2" fill="#5f4f47"/>
+    <rect x="8" y="4" width="6" height="2" fill="#625149"/>
+    <rect x="3" y="9" width="3" height="2" fill="#6b5850"/>
+    <rect x="10" y="9" width="4" height="2" fill="#4b3d37"/>
+  </g>
+
+  <!-- 4: carpet center -->
+  <g transform="translate(64,0)">
+    <rect width="16" height="16" fill="#6f3d4f"/>
+    <rect x="1" y="1" width="14" height="14" fill="#7b4758"/>
+    <rect x="3" y="3" width="10" height="10" fill="#8a5567"/>
+    <rect x="6" y="6" width="4" height="4" fill="#6e3b4d"/>
+  </g>
+
+  <!-- 5: carpet border -->
+  <g transform="translate(80,0)">
+    <rect width="16" height="16" fill="#705164"/>
+    <rect x="1" y="1" width="14" height="14" fill="#c8a86f"/>
+    <rect x="3" y="3" width="10" height="10" fill="#7d495a"/>
+    <rect x="0" y="0" width="16" height="1" fill="#efd8a0"/>
+    <rect x="0" y="15" width="16" height="1" fill="#9f7e4f"/>
+  </g>
+
+  <!-- 6: window -->
+  <g transform="translate(96,0)">
+    <rect width="16" height="16" fill="#50627d"/>
+    <rect x="2" y="2" width="12" height="12" fill="#80a7c8"/>
+    <rect x="3" y="3" width="10" height="10" fill="#9bc2de"/>
+    <rect x="7" y="2" width="2" height="12" fill="#617c99"/>
+    <rect x="2" y="7" width="12" height="2" fill="#617c99"/>
+  </g>
+
+  <!-- 7: trim -->
+  <g transform="translate(112,0)">
+    <rect width="16" height="16" fill="#cfa66f"/>
+    <rect x="0" y="0" width="16" height="2" fill="#f5d6a6"/>
+    <rect x="0" y="14" width="16" height="2" fill="#9b7747"/>
+    <rect x="2" y="6" width="12" height="4" fill="#e3c48e"/>
+  </g>
+
+  <!-- 8: dark floor -->
+  <g transform="translate(128,0)">
+    <rect width="16" height="16" fill="#283548"/>
+    <rect x="1" y="2" width="3" height="1" fill="#34475d"/>
+    <rect x="6" y="4" width="2" height="2" fill="#314258"/>
+    <rect x="10" y="2" width="2" height="1" fill="#3e5268"/>
+    <rect x="3" y="9" width="2" height="1" fill="#3c5067"/>
+    <rect x="11" y="10" width="3" height="2" fill="#33475f"/>
+  </g>
+
+  <!-- 9: doorway -->
+  <g transform="translate(144,0)">
+    <rect width="16" height="16" fill="#4a3b35"/>
+    <rect x="2" y="0" width="12" height="4" fill="#8d6d52"/>
+    <rect x="3" y="4" width="10" height="12" fill="#2a2320"/>
+    <rect x="4" y="5" width="8" height="9" fill="#3a302b"/>
+    <rect x="10" y="9" width="1" height="1" fill="#d9b57c"/>
+  </g>
+</svg>

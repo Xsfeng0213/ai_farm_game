@@ -1,0 +1,247 @@
+﻿:root {
+  --ink: #efe4bf;
+  --panel: rgba(22, 27, 43, 0.84);
+  --line-light: #f4d99c;
+  --line-dark: #6f4f39;
+  --field: rgba(11, 14, 22, 0.92);
+  --accent: #e8b35b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  color: var(--ink);
+  background: radial-gradient(circle at 20% 0%, #2a334d 0%, #161b2a 56%, #121520 100%);
+}
+
+.game-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.game-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.hud-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pixel-frame {
+  border: 3px solid var(--line-dark);
+  box-shadow:
+    inset 0 0 0 2px var(--line-light),
+    0 6px 0 rgba(5, 6, 9, 0.45);
+  background: var(--panel);
+  pointer-events: auto;
+}
+
+.hud-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  min-width: 250px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 5px;
+}
+
+.hud-brand {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+
+.room-label,
+.coins-label,
+.hint-label {
+  font-size: 12px;
+}
+
+.hint-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  min-width: 340px;
+  max-width: min(85vw, 640px);
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.skin-panel {
+  position: absolute;
+  left: 14px;
+  top: 120px;
+  width: 120px;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.skin-title {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.skin-panel button {
+  border: 2px solid var(--line-dark);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  background: var(--field);
+  color: #f8eac5;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.skin-panel button.active {
+  background: rgba(69, 84, 42, 0.95);
+  color: #f4ffcc;
+}
+
+.chat-panel {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: min(360px, 42vw);
+  padding: 8px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 170px) auto auto;
+  gap: 8px;
+}
+
+.chat-header {
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.chat-list {
+  border: 2px solid var(--line-dark);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  background: rgba(7, 10, 16, 0.95);
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.chat-item {
+  font-size: 11px;
+  line-height: 1.35;
+  margin-bottom: 4px;
+  color: #e9dec3;
+  text-shadow: 1px 1px 0 #17120f;
+  word-break: break-word;
+}
+
+.chat-row {
+  display: grid;
+  grid-template-columns: 1fr 68px;
+  gap: 6px;
+}
+
+.chat-row input,
+.chat-row button,
+.emoji-row button,
+.login-card input,
+.login-card button {
+  border: 2px solid var(--line-dark);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  background: var(--field);
+  color: #f8eac5;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 7px;
+}
+
+.chat-row input::placeholder,
+.login-card input::placeholder {
+  color: #a79a78;
+}
+
+.chat-row button,
+.emoji-row button,
+.login-card button {
+  cursor: pointer;
+  transition: transform 0.05s ease;
+}
+
+.chat-row button:active,
+.emoji-row button:active,
+.login-card button:active {
+  transform: translateY(1px);
+}
+
+.emoji-row {
+  display: flex;
+  gap: 6px;
+}
+
+.emoji-row button {
+  width: 36px;
+  height: 30px;
+  padding: 0;
+}
+
+.login-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 10, 17, 0.72);
+  z-index: 20;
+}
+
+.login-overlay.hidden {
+  display: none;
+}
+
+.login-card {
+  width: min(90vw, 360px);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.login-card h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.login-card p {
+  margin: 0;
+  font-size: 12px;
+  color: #e4d9bd;
+}
+
+@media (max-width: 900px) {
+  .chat-panel {
+    width: min(92vw, 380px);
+  }
+
+  .hint-bar {
+    min-width: 240px;
+    max-width: 88vw;
+  }
+
+  .hud-top {
+    min-width: 210px;
+  }
+}

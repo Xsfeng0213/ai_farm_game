@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="24" viewBox="0 0 128 24" shape-rendering="crispEdges">
+  <defs>
+    <g id="head-front">
+      <rect x="5" y="1" width="6" height="1" fill="#2e2739"/>
+      <rect x="4" y="2" width="8" height="4" fill="#f2d3b3"/>
+      <rect x="4" y="1" width="8" height="2" fill="#3c334b"/>
+      <rect x="5" y="4" width="1" height="1" fill="#2a1d1b"/>
+      <rect x="10" y="4" width="1" height="1" fill="#2a1d1b"/>
+    </g>
+
+    <g id="body-down-a">
+      <rect x="5" y="6" width="6" height="6" fill="#b06bc4"/>
+      <rect x="4" y="7" width="1" height="4" fill="#f2d3b3"/>
+      <rect x="11" y="7" width="1" height="4" fill="#f2d3b3"/>
+      <rect x="6" y="12" width="2" height="5" fill="#63346f"/>
+      <rect x="8" y="12" width="2" height="5" fill="#50285f"/>
+      <rect x="5" y="17" width="2" height="2" fill="#3c2c2a"/>
+      <rect x="9" y="17" width="2" height="2" fill="#3c2c2a"/>
+    </g>
+
+    <g id="body-down-b">
+      <rect x="5" y="6" width="6" height="6" fill="#b06bc4"/>
+      <rect x="4" y="7" width="1" height="4" fill="#f2d3b3"/>
+      <rect x="11" y="7" width="1" height="4" fill="#f2d3b3"/>
+      <rect x="5" y="12" width="2" height="5" fill="#63346f"/>
+      <rect x="9" y="12" width="2" height="5" fill="#50285f"/>
+      <rect x="4" y="17" width="2" height="2" fill="#3c2c2a"/>
+      <rect x="10" y="17" width="2" height="2" fill="#3c2c2a"/>
+    </g>
+
+    <g id="head-side">
+      <rect x="5" y="1" width="6" height="1" fill="#2e2739"/>
+      <rect x="4" y="2" width="8" height="4" fill="#f2d3b3"/>
+      <rect x="4" y="1" width="8" height="2" fill="#3c334b"/>
+      <rect x="5" y="4" width="1" height="1" fill="#2a1d1b"/>
+    </g>
+
+    <g id="body-left-a">
+      <rect x="5" y="6" width="6" height="6" fill="#b06bc4"/>
+      <rect x="4" y="7" width="1" height="4" fill="#f2d3b3"/>
+      <rect x="5" y="12" width="2" height="5" fill="#63346f"/>
+      <rect x="8" y="12" width="2" height="5" fill="#50285f"/>
+      <rect x="4" y="17" width="2" height="2" fill="#3c2c2a"/>
+      <rect x="8" y="17" width="2" height="2" fill="#3c2c2a"/>
+    </g>
+
+    <g id="body-left-b">
+      <rect x="5" y="6" width="6" height="6" fill="#b06bc4"/>
+      <rect x="4" y="7" width="1" height="4" fill="#f2d3b3"/>
+      <rect x="4" y="12" width="2" height="5" fill="#63346f"/>
+      <rect x="9" y="12" width="2" height="5" fill="#50285f"/>
+      <rect x="3" y="17" width="2" height="2" fill="#3c2c2a"/>
+      <rect x="10" y="17" width="2" height="2" fill="#3c2c2a"/>
+    </g>
+
+    <g id="head-back">
+      <rect x="5" y="1" width="6" height="1" fill="#2e2739"/>
+      <rect x="4" y="2" width="8" height="4" fill="#3c334b"/>
+      <rect x="4" y="1" width="8" height="3" fill="#30293d"/>
+    </g>
+
+    <g id="body-up-a">
+      <rect x="5" y="6" width="6" height="6" fill="#9658b3"/>
+      <rect x="6" y="12" width="2" height="5" fill="#63346f"/>
+      <rect x="8" y="12" width="2" height="5" fill="#50285f"/>
+      <rect x="5" y="17" width="2" height="2" fill="#3c2c2a"/>
+      <rect x="9" y="17" width="2" height="2" fill="#3c2c2a"/>
+    </g>
+
+    <g id="body-up-b">
+      <rect x="5" y="6" width="6" height="6" fill="#9658b3"/>
+      <rect x="5" y="12" width="2" height="5" fill="#63346f"/>
+      <rect x="9" y="12" width="2" height="5" fill="#50285f"/>
+      <rect x="4" y="17" width="2" height="2" fill="#3c2c2a"/>
+      <rect x="10" y="17" width="2" height="2" fill="#3c2c2a"/>
+    </g>
+  </defs>
+
+  <g transform="translate(0,0)"><use href="#head-front"/><use href="#body-down-a"/></g>
+  <g transform="translate(16,0)"><use href="#head-front"/><use href="#body-down-b"/></g>
+  <g transform="translate(32,0)"><use href="#head-side"/><use href="#body-left-a"/></g>
+  <g transform="translate(48,0)"><use href="#head-side"/><use href="#body-left-b"/></g>
+  <g transform="translate(64,0)"><g transform="translate(16,0) scale(-1,1)"><use href="#head-side"/><use href="#body-left-a"/></g></g>
+  <g transform="translate(80,0)"><g transform="translate(16,0) scale(-1,1)"><use href="#head-side"/><use href="#body-left-b"/></g></g>
+  <g transform="translate(96,0)"><use href="#head-back"/><use href="#body-up-a"/></g>
+  <g transform="translate(112,0)"><use href="#head-back"/><use href="#body-up-b"/></g>
+</svg>
