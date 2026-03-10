@@ -2,6 +2,7 @@ export type {
   ChatMessagePayload,
   ChatPayload,
   ClientToServerEvents,
+  CropType,
   FacingDirection,
   FarmInteractPayload,
   FarmPlotSnapshot,

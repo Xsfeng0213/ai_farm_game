@@ -1,0 +1,17 @@
+{
+  "baseUrl": "http://localhost:5177",
+  "pageErrorsA": [],
+  "pageErrorsB": [],
+  "consoleErrorsA": [],
+  "consoleErrorsB": [],
+  "hintBeforePlant1": "Press E to plant on West A3",
+  "hintBeforePlant2": "Press E to plant on West A2",
+  "hintBeforePlant3": "Press E to plant on West A1",
+  "hintBAfterPlant": "Wheat is growing at West A1",
+  "hintAHarvest": "Press E to harvest Wheat at West A1",
+  "hintBHarvest": "Press E to harvest Wheat at West A1",
+  "coinB0": "Coins 0",
+  "coinB1": "Coins 2",
+  "hintAAfterHarvest": "Press E to plant on West A1",
+  "hintBAfterHarvest": "Press E to plant on West A1"
+}

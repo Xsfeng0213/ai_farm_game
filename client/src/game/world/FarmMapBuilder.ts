@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+﻿import Phaser from 'phaser';
 import { FARM_CONFIG } from '../config/farmConfig';
 
 const TILE = {
@@ -28,17 +28,29 @@ function isPathTile(x: number, y: number, cols: number): boolean {
     return true;
   }
 
-  return y >= 28 && y <= 31 && x >= center - 18 && x <= center + 18;
+  return y >= 28 && y <= 31 && x >= center - 20 && x <= center + 20;
 }
 
-function isFarmlandTile(x: number, y: number): boolean {
-  const westField = x >= 16 && x <= 34 && y >= 34 && y <= 47;
-  const eastField = x >= 46 && x <= 64 && y >= 34 && y <= 47;
-  return westField || eastField;
+function isWestField(x: number, y: number): boolean {
+  return x >= 12 && x <= 36 && y >= 31 && y <= 48;
+}
+
+function isEastField(x: number, y: number): boolean {
+  return x >= 43 && x <= 67 && y >= 31 && y <= 48;
 }
 
 function isPondTile(x: number, y: number): boolean {
-  return x >= 71 && x <= 77 && y >= 14 && y <= 22;
+  return x >= 70 && x <= 77 && y >= 13 && y <= 22;
+}
+
+function isFenceTile(x: number, y: number): boolean {
+  const westFrame = (x === 11 || x === 37) && y >= 30 && y <= 49;
+  const westTopBottom = (y === 30 || y === 49) && x >= 11 && x <= 37;
+
+  const eastFrame = (x === 42 || x === 68) && y >= 30 && y <= 49;
+  const eastTopBottom = (y === 30 || y === 49) && x >= 42 && x <= 68;
+
+  return westFrame || westTopBottom || eastFrame || eastTopBottom;
 }
 
 export function buildFarmMap(scene: Phaser.Scene): void {
@@ -54,21 +66,18 @@ export function buildFarmMap(scene: Phaser.Scene): void {
         frame = TILE.hedge;
       } else if (isPathTile(x, y, cols)) {
         frame = TILE.path;
-      } else if (isFarmlandTile(x, y)) {
-        if (y % 2 === 0) {
-          frame = (x + y) % 4 === 0 ? TILE.cropA : TILE.cropB;
-        } else {
-          frame = (x + y) % 2 === 0 ? TILE.soilA : TILE.soilB;
+      } else if (isWestField(x, y) || isEastField(x, y)) {
+        const inColumnStripe = x % 3 === 0;
+        frame = inColumnStripe ? TILE.soilA : TILE.soilB;
+
+        if (y % 4 === 0) {
+          frame = inColumnStripe ? TILE.cropA : TILE.cropB;
         }
       } else if (isPondTile(x, y)) {
         frame = TILE.water;
       }
 
-      if ((x === 15 || x === 35 || x === 45 || x === 65) && y >= 33 && y <= 48) {
-        frame = TILE.fence;
-      }
-
-      if ((y === 33 || y === 48) && ((x >= 15 && x <= 35) || (x >= 45 && x <= 65))) {
+      if (isFenceTile(x, y)) {
         frame = TILE.fence;
       }
 
@@ -76,23 +85,26 @@ export function buildFarmMap(scene: Phaser.Scene): void {
     }
   }
 
+  scene.add.rectangle(394, 748, 328, 174, 0x2b2218, 0.22).setDepth(2);
+  scene.add.rectangle(874, 748, 328, 174, 0x2b2218, 0.22).setDepth(2);
+
   const treePositions = [
-    [132, 188],
-    [246, 160],
-    [1046, 174],
-    [1142, 202],
-    [186, 618],
-    [314, 688],
-    [964, 676],
-    [1128, 632]
+    [132, 180],
+    [244, 164],
+    [1060, 174],
+    [1148, 202],
+    [116, 610],
+    [1148, 620],
+    [142, 730],
+    [1124, 728]
   ] as const;
 
   treePositions.forEach(([x, y]) => {
     scene.add.image(x, y, 'tree').setDepth(y + 18).setScale(0.95);
   });
 
-  const rabbit = scene.add.image(512, 618, 'rabbit').setDepth(624).setScale(1.28);
-  const cat = scene.add.image(780, 596, 'cat').setDepth(604).setScale(1.26);
+  const rabbit = scene.add.image(618, 708, 'rabbit').setDepth(724).setScale(1.28);
+  const cat = scene.add.image(668, 692, 'cat').setDepth(700).setScale(1.26);
 
   scene.tweens.add({
     targets: rabbit,

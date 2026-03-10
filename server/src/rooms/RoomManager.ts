@@ -1,6 +1,7 @@
 ﻿import type {
   ChatMessagePayload,
   ChatPayload,
+  CropType,
   FarmInteractPayload,
   FarmPlotSnapshot,
   FarmPlotUpdatedPayload,
@@ -25,6 +26,7 @@ interface FarmPlotRecord extends FarmPlotSnapshot {}
 
 const ROOM_FALLBACK: RoomId = 'lobby-1';
 const MAX_MESSAGE_LENGTH = 120;
+const CROP_TYPES: CropType[] = ['wheat', 'potato', 'carrot'];
 
 export class RoomManager {
   private readonly players = new Map<string, PlayerRecord>();
@@ -191,6 +193,7 @@ export class RoomManager {
 
     if (plot.state === 'empty') {
       plot.state = 'planted';
+      plot.cropType = this.pickCropType(plot.id);
       plot.plantedBy = player.id;
       plot.readyAt = now + FARM_GROWTH_MS;
       plot.updatedAt = now;
@@ -210,6 +213,7 @@ export class RoomManager {
     }
 
     plot.state = 'empty';
+    plot.cropType = undefined;
     plot.plantedBy = undefined;
     plot.readyAt = undefined;
     plot.updatedAt = now;
@@ -343,5 +347,10 @@ export class RoomManager {
 
   private isFarmRoom(roomId: RoomId): boolean {
     return roomId.endsWith(':farm');
+  }
+
+  private pickCropType(plotId: FarmPlotSnapshot['id']): CropType {
+    const index = FARM_PLOT_IDS.indexOf(plotId);
+    return CROP_TYPES[(index >= 0 ? index : 0) % CROP_TYPES.length];
   }
 }

@@ -83,10 +83,12 @@ export interface InteractionStatePayload {
 }
 
 export type FarmPlotState = 'empty' | 'planted' | 'harvestable';
+export type CropType = 'wheat' | 'potato' | 'carrot';
 
 export interface FarmPlotSnapshot {
   id: FarmPlotId;
   state: FarmPlotState;
+  cropType?: CropType;
   plantedBy?: PlayerId;
   readyAt?: number;
   updatedAt: number;

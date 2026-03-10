@@ -1,5 +1,5 @@
-import Phaser from 'phaser';
-import type { FarmPlotSnapshot, FarmPlotState } from '../../types/protocol';
+﻿import Phaser from 'phaser';
+import type { CropType, FarmPlotSnapshot, FarmPlotState } from '../../types/protocol';
 import { FARM_PLOT_DEFS, FARM_PLOT_INTERACT_RADIUS } from '../config/farmPlotConfig';
 
 interface FarmPlotRuntime {
@@ -8,8 +8,12 @@ interface FarmPlotRuntime {
   x: number;
   y: number;
   state: FarmPlotState;
-  sprite: Phaser.GameObjects.Image;
-  pulse: Phaser.Tweens.Tween | null;
+  cropType?: CropType;
+  bed: Phaser.GameObjects.Image;
+  crop: Phaser.GameObjects.Image;
+  outline: Phaser.GameObjects.Rectangle;
+  bedPulse: Phaser.Tweens.Tween | null;
+  cropSway: Phaser.Tweens.Tween | null;
 }
 
 export interface FarmPlotCandidate {
@@ -17,24 +21,56 @@ export interface FarmPlotCandidate {
   label: string;
   state: FarmPlotState;
   action: 'plant' | 'harvest' | null;
+  cropType?: CropType;
 }
 
-const TILE_FRAME_BY_STATE: Record<FarmPlotState, number> = {
-  empty: 3,
-  planted: 5,
-  harvestable: 6
+const BED_TEXTURE_BY_STATE: Record<FarmPlotState, string> = {
+  empty: 'farm_plot_empty',
+  planted: 'farm_plot_planted',
+  harvestable: 'farm_plot_harvestable'
 };
+
+const CROP_TEXTURE: Record<CropType, { planted: string; harvestable: string }> = {
+  wheat: {
+    planted: 'crop_wheat_planted',
+    harvestable: 'crop_wheat_harvestable'
+  },
+  potato: {
+    planted: 'crop_potato_planted',
+    harvestable: 'crop_potato_harvestable'
+  },
+  carrot: {
+    planted: 'crop_carrot_planted',
+    harvestable: 'crop_carrot_harvestable'
+  }
+};
+
+const PLOT_SCALE = 1.08;
+const CROP_SCALE = 1.12;
 
 export class FarmPlotSystem {
   private readonly plots = new Map<FarmPlotSnapshot['id'], FarmPlotRuntime>();
   private highlightedId: FarmPlotSnapshot['id'] | null = null;
+  private readonly interactionArrow: Phaser.GameObjects.Image;
 
   constructor(private readonly scene: Phaser.Scene) {
     FARM_PLOT_DEFS.forEach((def) => {
-      const sprite = scene.add
-        .image(def.x, def.y, 'farm_tiles', TILE_FRAME_BY_STATE.empty)
-        .setScale(1.45)
-        .setDepth(def.y + 4);
+      const bed = scene.add
+        .image(def.x, def.y, BED_TEXTURE_BY_STATE.empty)
+        .setScale(PLOT_SCALE)
+        .setDepth(def.y + 3);
+
+      const crop = scene.add
+        .image(def.x, def.y - 6, 'crop_wheat_planted')
+        .setScale(CROP_SCALE)
+        .setDepth(def.y + 4)
+        .setVisible(false);
+
+      const outline = scene.add
+        .rectangle(def.x, def.y, 72, 72, 0xffe39f, 0)
+        .setStrokeStyle(3, 0xffd074, 0.95)
+        .setDepth(def.y + 5)
+        .setVisible(false);
 
       this.plots.set(def.id, {
         id: def.id,
@@ -42,20 +78,29 @@ export class FarmPlotSystem {
         x: def.x,
         y: def.y,
         state: 'empty',
-        sprite,
-        pulse: null
+        bed,
+        crop,
+        outline,
+        bedPulse: null,
+        cropSway: null
       });
     });
+
+    this.interactionArrow = scene.add
+      .image(0, 0, 'farm_interact_arrow')
+      .setDepth(2000)
+      .setVisible(false)
+      .setScale(1.5);
   }
 
   applyFullState(plots: FarmPlotSnapshot[]): void {
     plots.forEach((plot) => {
-      this.applyPlotState(plot.id, plot.state);
+      this.applyPlotSnapshot(plot);
     });
   }
 
   applyPlotUpdate(plot: FarmPlotSnapshot): void {
-    this.applyPlotState(plot.id, plot.state);
+    this.applyPlotSnapshot(plot);
   }
 
   findCandidate(playerPosition: Phaser.Math.Vector2): FarmPlotCandidate | null {
@@ -96,39 +141,100 @@ export class FarmPlotSystem {
       plotId: nearest.id,
       label: nearest.label,
       state: nearest.state,
-      action
+      action,
+      cropType: nearest.cropType
     };
   }
 
-  private applyPlotState(plotId: FarmPlotSnapshot['id'], state: FarmPlotState): void {
+  getPlotPosition(plotId: FarmPlotSnapshot['id']): Phaser.Math.Vector2 | null {
+    const runtime = this.plots.get(plotId);
+    if (!runtime) {
+      return null;
+    }
+
+    return new Phaser.Math.Vector2(runtime.x, runtime.y);
+  }
+
+  showFloatingText(plotId: FarmPlotSnapshot['id'], text: string, tint = '#ffe3aa'): void {
     const runtime = this.plots.get(plotId);
     if (!runtime) {
       return;
     }
 
-    runtime.state = state;
-    runtime.sprite.setFrame(TILE_FRAME_BY_STATE[state]);
+    const popup = this.scene.add
+      .text(runtime.x, runtime.y - 48, text, {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: tint,
+        stroke: '#20150f',
+        strokeThickness: 3
+      })
+      .setOrigin(0.5)
+      .setDepth(2100)
+      .setScale(0.92);
 
-    if (state === 'harvestable') {
-      runtime.sprite.setTint(0xffe184);
-      if (!runtime.pulse) {
-        runtime.pulse = this.scene.tweens.add({
-          targets: runtime.sprite,
-          scaleX: runtime.sprite.scaleX + 0.15,
-          scaleY: runtime.sprite.scaleY + 0.15,
-          yoyo: true,
-          repeat: -1,
-          duration: 340,
-          ease: 'Sine.InOut'
-        });
+    this.scene.tweens.add({
+      targets: popup,
+      y: popup.y - 24,
+      alpha: 0,
+      scale: 1,
+      duration: 680,
+      ease: 'Cubic.Out',
+      onComplete: () => {
+        popup.destroy();
       }
+    });
+  }
+
+  private applyPlotSnapshot(snapshot: FarmPlotSnapshot): void {
+    const runtime = this.plots.get(snapshot.id);
+    if (!runtime) {
       return;
     }
 
-    runtime.sprite.clearTint();
-    runtime.pulse?.stop();
-    runtime.pulse = null;
-    runtime.sprite.setScale(1.45);
+    runtime.state = snapshot.state;
+    runtime.cropType = snapshot.cropType;
+
+    runtime.bed.setTexture(BED_TEXTURE_BY_STATE[snapshot.state]);
+
+    this.stopPlotTweens(runtime);
+
+    if (snapshot.state === 'empty' || !snapshot.cropType) {
+      runtime.crop.setVisible(false);
+      runtime.bed.clearTint();
+      return;
+    }
+
+    const cropTexture =
+      snapshot.state === 'harvestable'
+        ? CROP_TEXTURE[snapshot.cropType].harvestable
+        : CROP_TEXTURE[snapshot.cropType].planted;
+
+    runtime.crop.setTexture(cropTexture).setVisible(true).setScale(CROP_SCALE);
+
+    runtime.cropSway = this.scene.tweens.add({
+      targets: runtime.crop,
+      y: runtime.crop.y - 3,
+      yoyo: true,
+      repeat: -1,
+      duration: snapshot.state === 'harvestable' ? 360 : 620,
+      ease: 'Sine.InOut'
+    });
+
+    if (snapshot.state === 'harvestable') {
+      runtime.bed.setTint(0xffd57a);
+      runtime.bedPulse = this.scene.tweens.add({
+        targets: runtime.bed,
+        alpha: 0.68,
+        yoyo: true,
+        repeat: -1,
+        duration: 300,
+        ease: 'Sine.InOut'
+      });
+    } else {
+      runtime.bed.clearTint();
+      runtime.bed.setAlpha(1);
+    }
   }
 
   private setHighlight(plotId: FarmPlotSnapshot['id'] | null): void {
@@ -137,14 +243,49 @@ export class FarmPlotSystem {
     }
 
     if (this.highlightedId) {
-      const prev = this.plots.get(this.highlightedId);
-      prev?.sprite.setAlpha(1);
+      const previous = this.plots.get(this.highlightedId);
+      if (previous) {
+        previous.outline.setVisible(false);
+        previous.bed.setScale(PLOT_SCALE);
+      }
     }
 
     this.highlightedId = plotId;
-    if (plotId) {
-      const current = this.plots.get(plotId);
-      current?.sprite.setAlpha(0.86);
+    if (!plotId) {
+      this.interactionArrow.setVisible(false);
+      return;
     }
+
+    const current = this.plots.get(plotId);
+    if (!current) {
+      this.interactionArrow.setVisible(false);
+      return;
+    }
+
+    current.outline.setVisible(true);
+    current.bed.setScale(PLOT_SCALE + 0.04);
+
+    this.interactionArrow
+      .setVisible(true)
+      .setPosition(current.x, current.y - 52)
+      .setTint(0xffd983);
+
+    this.scene.tweens.add({
+      targets: this.interactionArrow,
+      y: this.interactionArrow.y - 6,
+      yoyo: true,
+      repeat: 1,
+      duration: 150,
+      ease: 'Sine.Out'
+    });
+  }
+
+  private stopPlotTweens(plot: FarmPlotRuntime): void {
+    plot.bedPulse?.stop();
+    plot.cropSway?.stop();
+    plot.bedPulse = null;
+    plot.cropSway = null;
+    plot.bed.setAlpha(1);
+    plot.crop.setY(plot.y - 6);
   }
 }

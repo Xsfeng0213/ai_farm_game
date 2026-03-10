@@ -1,6 +1,7 @@
 ﻿import Phaser from 'phaser';
 import type {
   ChatMessagePayload,
+  CropType,
   FacingDirection,
   FarmPlotUpdatedPayload,
   FarmStatePayload,
@@ -226,14 +227,19 @@ export class FarmScene extends Phaser.Scene {
       }
 
       this.farmPlotSystem?.applyPlotUpdate(payload.plot);
+      const cropLabel = payload.plot.cropType ? this.cropLabel(payload.plot.cropType) : 'Crop';
 
       if (payload.actorId === this.selfId && typeof payload.actorCoins === 'number') {
         this.coins = payload.actorCoins;
         this.ui.updateCoins(this.coins);
       }
 
-      if (payload.action === 'harvested') {
-        this.ui.appendChat('[system] A crop was harvested');
+      if (payload.action === 'planted') {
+        this.farmPlotSystem?.showFloatingText(payload.plot.id, `${cropLabel} planted`, '#a8f3a0');
+      } else if (payload.action === 'grown') {
+        this.farmPlotSystem?.showFloatingText(payload.plot.id, `${cropLabel} ready`, '#ffe48f');
+      } else if (payload.action === 'harvested') {
+        this.farmPlotSystem?.showFloatingText(payload.plot.id, '+2 coins', '#ffe58b');
       }
     });
   }
@@ -367,9 +373,9 @@ export class FarmScene extends Phaser.Scene {
     if (candidate.action === 'plant') {
       this.ui.showHint(`Press E to plant on ${candidate.label}`);
     } else if (candidate.action === 'harvest') {
-      this.ui.showHint(`Press E to harvest ${candidate.label}`);
+      this.ui.showHint(`Press E to harvest ${this.cropLabel(candidate.cropType)} at ${candidate.label}`);
     } else {
-      this.ui.showHint(`${candidate.label} is growing...`);
+      this.ui.showHint(`${this.cropLabel(candidate.cropType)} is growing at ${candidate.label}`);
     }
 
     if (
@@ -487,5 +493,21 @@ export class FarmScene extends Phaser.Scene {
       },
       remotes: []
     };
+  }
+
+  private cropLabel(cropType: CropType | undefined): string {
+    if (!cropType) {
+      return 'Crop';
+    }
+
+    if (cropType === 'wheat') {
+      return 'Wheat';
+    }
+
+    if (cropType === 'potato') {
+      return 'Potato';
+    }
+
+    return 'Carrot';
   }
 }
