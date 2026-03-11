@@ -90,7 +90,10 @@ export interface FarmPlotSnapshot {
   state: FarmPlotState;
   cropType?: CropType;
   plantedBy?: PlayerId;
+  plantedAt?: number;
   readyAt?: number;
+  watered?: boolean;
+  fertilized?: boolean;
   updatedAt: number;
 }
 
@@ -101,12 +104,14 @@ export interface FarmStatePayload {
 
 export interface FarmInteractPayload {
   plotId: FarmPlotId;
+  action: 'plant' | 'harvest' | 'water' | 'fertilize';
+  cropType?: CropType;
 }
 
 export interface FarmPlotUpdatedPayload {
   roomId: RoomId;
   plot: FarmPlotSnapshot;
-  action: 'planted' | 'grown' | 'harvested';
+  action: 'planted' | 'watered' | 'fertilized' | 'grown' | 'harvested';
   actorId?: PlayerId;
   actorCoins?: number;
   serverTime: number;

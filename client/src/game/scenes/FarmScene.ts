@@ -3,6 +3,7 @@ import type {
   ChatMessagePayload,
   CropType,
   FacingDirection,
+  FarmPlotSnapshot,
   FarmPlotUpdatedPayload,
   FarmStatePayload,
   InteractionStatePayload,
@@ -19,11 +20,12 @@ import { FarmPlotSystem } from '../systems/FarmPlotSystem';
 import { InputSystem } from '../systems/InputSystem';
 import type { PlayerSkin } from '../types/playerSkin';
 import type { SceneSessionData, SceneStartPayload } from '../types/sceneSession';
+import { FarmActionPanel } from '../ui/FarmActionPanel';
 import { buildFarmMap } from '../world/FarmMapBuilder';
 import { SCENE_KEYS } from './SceneKeys';
 import type { SharedSceneOptions } from './SceneOptions';
 
-const FARM_ACTION_COOLDOWN_MS = 220;
+const FARM_ACTION_COOLDOWN_MS = 280;
 
 export class FarmScene extends Phaser.Scene {
   private readonly network: SharedSceneOptions['network'];
@@ -41,6 +43,8 @@ export class FarmScene extends Phaser.Scene {
 
   private inputSystem: InputSystem | null = null;
   private farmPlotSystem: FarmPlotSystem | null = null;
+  private actionPanel: FarmActionPanel | null = null;
+  private actionPanelPlotId: FarmPlotSnapshot['id'] | null = null;
   private interactKey: Phaser.Input.Keyboard.Key | null = null;
 
   private direction: FacingDirection = 'down';
@@ -77,7 +81,11 @@ export class FarmScene extends Phaser.Scene {
     this.createLocalPlayerAtSpawn();
     this.inputSystem = new InputSystem(this);
     this.farmPlotSystem = new FarmPlotSystem(this);
+    this.actionPanel = new FarmActionPanel(this);
     this.interactKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.E) ?? null;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.hideActionPanel();
+    });
 
     this.network.offAll();
     this.bindNetworkEvents();
@@ -89,7 +97,7 @@ export class FarmScene extends Phaser.Scene {
     });
 
     this.ui.updateCoins(this.coins);
-    this.ui.showHint('Farm ready. Press E near field to plant/harvest');
+    this.ui.showHint('Farm ready. Press E near field to interact');
     this.ui.appendChat('[system] Entered farm map');
     this.syncRoomHud();
     this.cameras.main.fadeIn(240, 0, 0, 0);
@@ -108,10 +116,14 @@ export class FarmScene extends Phaser.Scene {
     this.updateLocalMovement(delta, now);
     this.updateRemotePlayers(delta);
     this.updateFarmInteractionPrompt(now);
+    this.updateActionPanelPosition();
     this.checkLobbyGate();
   }
 
   private resetSceneState(): void {
+    this.actionPanel?.hide();
+    this.actionPanel = null;
+    this.actionPanelPlotId = null;
     this.isTransitioning = false;
     this.selfId = '';
     this.activeRoomId = this.networkRoomId();
@@ -229,16 +241,32 @@ export class FarmScene extends Phaser.Scene {
       this.farmPlotSystem?.applyPlotUpdate(payload.plot);
       const cropLabel = payload.plot.cropType ? this.cropLabel(payload.plot.cropType) : 'Crop';
 
+      if (
+        this.actionPanelPlotId === payload.plot.id &&
+        (payload.plot.state !== 'planted' || (payload.plot.watered && payload.plot.fertilized))
+      ) {
+        this.hideActionPanel();
+      }
+
       if (payload.actorId === this.selfId && typeof payload.actorCoins === 'number') {
         this.coins = payload.actorCoins;
         this.ui.updateCoins(this.coins);
       }
 
       if (payload.action === 'planted') {
+        this.farmPlotSystem?.pulsePlot(payload.plot.id, 0x88d07a);
         this.farmPlotSystem?.showFloatingText(payload.plot.id, `${cropLabel} planted`, '#a8f3a0');
+      } else if (payload.action === 'watered') {
+        this.farmPlotSystem?.pulsePlot(payload.plot.id, 0x6ea8e4);
+        this.farmPlotSystem?.showFloatingText(payload.plot.id, 'Watered', '#9edbff');
+      } else if (payload.action === 'fertilized') {
+        this.farmPlotSystem?.pulsePlot(payload.plot.id, 0xc19b64);
+        this.farmPlotSystem?.showFloatingText(payload.plot.id, 'Fertilized', '#f3cc94');
       } else if (payload.action === 'grown') {
+        this.farmPlotSystem?.pulsePlot(payload.plot.id, 0xffd97a);
         this.farmPlotSystem?.showFloatingText(payload.plot.id, `${cropLabel} ready`, '#ffe48f');
       } else if (payload.action === 'harvested') {
+        this.farmPlotSystem?.pulsePlot(payload.plot.id, 0xffdd8b);
         this.farmPlotSystem?.showFloatingText(payload.plot.id, '+2 coins', '#ffe58b');
       }
     });
@@ -366,31 +394,137 @@ export class FarmScene extends Phaser.Scene {
 
     const candidate = this.farmPlotSystem.findCandidate(new Phaser.Math.Vector2(this.localPlayer.x, this.localPlayer.y));
     if (!candidate) {
-      this.ui.showHint('Farm ready. Press E near field to plant/harvest');
+      this.hideActionPanel();
+      this.ui.showHint('Farm ready. Press E near field to interact');
       return;
     }
 
-    if (candidate.action === 'plant') {
-      this.ui.showHint(`Press E to plant on ${candidate.label}`);
+    if (candidate.action === 'plant_menu') {
+      this.ui.showHint(`Press E to choose crop for ${candidate.label}`);
+    } else if (candidate.action === 'care_menu') {
+      this.ui.showHint(
+        `Press E to care ${this.cropLabel(candidate.cropType)} (${candidate.watered ? 'W' : '-'} / ${candidate.fertilized ? 'F' : '-'})`
+      );
     } else if (candidate.action === 'harvest') {
+      this.hideActionPanel();
       this.ui.showHint(`Press E to harvest ${this.cropLabel(candidate.cropType)} at ${candidate.label}`);
     } else {
+      this.hideActionPanel();
       this.ui.showHint(`${this.cropLabel(candidate.cropType)} is growing at ${candidate.label}`);
     }
 
+    if (!this.interactKey || !Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      return;
+    }
+
+    if (now - this.lastFarmActionAt <= FARM_ACTION_COOLDOWN_MS) {
+      return;
+    }
+
+    if (candidate.action === 'plant_menu') {
+      this.lastFarmActionAt = now;
+      this.openPlantMenu(candidate.plotId, candidate.label);
+      return;
+    }
+
+    if (candidate.action === 'care_menu') {
+      this.lastFarmActionAt = now;
+      this.openCareMenu(candidate.plotId, candidate.canWater, candidate.canFertilize);
+      return;
+    }
+
     if (
-      candidate.action &&
-      this.interactKey &&
-      Phaser.Input.Keyboard.JustDown(this.interactKey) &&
+      candidate.action === 'harvest' &&
       now - this.lastFarmActionAt > FARM_ACTION_COOLDOWN_MS
     ) {
       this.lastFarmActionAt = now;
-      this.network.sendFarmInteract({ plotId: candidate.plotId });
+      this.hideActionPanel();
+      this.network.sendFarmInteract({ plotId: candidate.plotId, action: 'harvest' });
       this.state = 'interacting';
       this.localPlayer.setVisualState(this.direction, this.state);
       this.sendMoveIfNeeded(true);
     }
   }
+
+  private openPlantMenu(plotId: FarmPlotSnapshot['id'], label: string): void {
+    if (!this.actionPanel || !this.localPlayer) {
+      return;
+    }
+
+    this.actionPanelPlotId = plotId;
+    this.actionPanel.show(
+      this.localPlayer.x,
+      this.localPlayer.y - 86,
+      `Plant ${label}`,
+      [
+        { id: 'wheat', label: 'Wheat' },
+        { id: 'carrot', label: 'Carrot' },
+        { id: 'potato', label: 'Potato' }
+      ],
+      (id) => {
+        if (id !== 'wheat' && id !== 'carrot' && id !== 'potato') {
+          return;
+        }
+
+        this.network.sendFarmInteract({ plotId, action: 'plant', cropType: id });
+        this.state = 'interacting';
+        this.localPlayer?.setVisualState(this.direction, this.state);
+        this.sendMoveIfNeeded(true);
+        this.hideActionPanel();
+      }
+    );
+  }
+
+  private openCareMenu(plotId: FarmPlotSnapshot['id'], canWater: boolean, canFertilize: boolean): void {
+    if (!this.actionPanel || !this.localPlayer) {
+      return;
+    }
+
+    this.actionPanelPlotId = plotId;
+    this.actionPanel.show(
+      this.localPlayer.x,
+      this.localPlayer.y - 82,
+      'Care Action',
+      [
+        { id: 'water', label: canWater ? 'Water' : 'Watered', disabled: !canWater },
+        { id: 'fertilize', label: canFertilize ? 'Fertilize' : 'Fertilized', disabled: !canFertilize }
+      ],
+      (id) => {
+        if (id !== 'water' && id !== 'fertilize') {
+          return;
+        }
+
+        this.network.sendFarmInteract({ plotId, action: id });
+        this.state = 'interacting';
+        this.localPlayer?.setVisualState(this.direction, this.state);
+        this.sendMoveIfNeeded(true);
+        this.hideActionPanel();
+      }
+    );
+  }
+
+  private hideActionPanel(): void {
+    this.actionPanel?.hide();
+    this.actionPanelPlotId = null;
+  }
+
+  private updateActionPanelPosition(): void {
+    if (!this.actionPanel?.isVisible() || !this.localPlayer || !this.farmPlotSystem || !this.actionPanelPlotId) {
+      return;
+    }
+
+    const plotPos = this.farmPlotSystem.getPlotPosition(this.actionPanelPlotId);
+    if (plotPos) {
+      const distance = Phaser.Math.Distance.Between(this.localPlayer.x, this.localPlayer.y, plotPos.x, plotPos.y);
+      if (distance > 110) {
+        this.hideActionPanel();
+        return;
+      }
+    }
+
+    this.actionPanel.setPosition(this.localPlayer.x, this.localPlayer.y - 86);
+  }
+
 
   private checkLobbyGate(): void {
     if (!this.localPlayer || this.isTransitioning) {
@@ -411,6 +545,7 @@ export class FarmScene extends Phaser.Scene {
       return;
     }
 
+    this.hideActionPanel();
     this.isTransitioning = true;
     this.ui.showHint('Returning to lobby...');
     this.state = this.stateMachine.reset('idle', Date.now());

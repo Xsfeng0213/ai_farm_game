@@ -32,8 +32,11 @@ app.innerHTML = `
         <span id="hint-label" class="hint-label">Input nickname to enter</span>
       </section>
 
-      <section class="pixel-frame chat-panel">
-        <div class="chat-header">Lobby Chat</div>
+      <section id="chat-panel" class="pixel-frame chat-panel">
+        <div class="chat-head-row">
+          <div class="chat-header">Lobby Chat</div>
+          <button id="chat-toggle-btn" class="chat-toggle-btn" type="button">Hide</button>
+        </div>
         <div id="chat-list" class="chat-list"></div>
         <div class="chat-row">
           <input id="chat-input" type="text" maxlength="120" placeholder="Say something..." />
@@ -64,6 +67,8 @@ const hintLabel = document.querySelector<HTMLElement>('#hint-label');
 const chatList = document.querySelector<HTMLElement>('#chat-list');
 const chatInput = document.querySelector<HTMLInputElement>('#chat-input');
 const sendButton = document.querySelector<HTMLButtonElement>('#send-btn');
+const chatPanel = document.querySelector<HTMLElement>('#chat-panel');
+const chatToggleButton = document.querySelector<HTMLButtonElement>('#chat-toggle-btn');
 const emojiButtons = document.querySelectorAll<HTMLButtonElement>('.emoji-row button');
 const skinButtons = document.querySelectorAll<HTMLButtonElement>('.skin-panel button');
 const gameMount = document.querySelector<HTMLElement>('#game-mount');
@@ -78,6 +83,8 @@ if (
   !chatList ||
   !chatInput ||
   !sendButton ||
+  !chatPanel ||
+  !chatToggleButton ||
   !gameMount ||
   !loginOverlay ||
   !nicknameInput ||
@@ -94,6 +101,8 @@ const ui = new DomUiBridge({
   chatList,
   chatInput,
   sendButton,
+  chatPanel,
+  chatToggleButton,
   emojiButtons,
   skinButtons
 });
@@ -112,13 +121,14 @@ const joinGame = (): void => {
     return;
   }
 
-  startGame({
+  const game = startGame({
     mount: gameMount,
     nickname,
     roomId: DEFAULT_ROOM_ID,
     serverUrl: SERVER_URL,
     ui
   });
+  (window as Window & { __AI_FARM_GAME__?: unknown }).__AI_FARM_GAME__ = game;
 
   gameStarted = true;
   loginOverlay.classList.add('hidden');

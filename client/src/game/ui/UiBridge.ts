@@ -5,6 +5,8 @@ interface UiElements {
   roomLabel: HTMLElement;
   coinsLabel: HTMLElement;
   hintLabel: HTMLElement;
+  chatPanel: HTMLElement;
+  chatToggleButton: HTMLButtonElement;
   chatList: HTMLElement;
   chatInput: HTMLInputElement;
   sendButton: HTMLButtonElement;
@@ -17,6 +19,8 @@ export class DomUiBridge implements UiControls {
   private sendHandler: ((message: string) => void) | null = null;
   private emojiHandler: ((emoji: string) => void) | null = null;
   private skinHandler: ((skin: PlayerSkin) => void) | null = null;
+  private chatCollapsed = false;
+  private unreadCount = 0;
 
   constructor(elements: UiElements) {
     this.elements = elements;
@@ -37,6 +41,11 @@ export class DomUiBridge implements UiControls {
     item.textContent = message;
     this.elements.chatList.appendChild(item);
     this.elements.chatList.scrollTop = this.elements.chatList.scrollHeight;
+
+    if (this.chatCollapsed) {
+      this.unreadCount += 1;
+      this.refreshChatToggleLabel();
+    }
   }
 
   showHint(message: string): void {
@@ -56,6 +65,10 @@ export class DomUiBridge implements UiControls {
   }
 
   private bindDomListeners(): void {
+    this.elements.chatToggleButton.addEventListener('click', () => {
+      this.toggleChatPanel();
+    });
+
     this.elements.sendButton.addEventListener('click', () => {
       this.emitChat();
     });
@@ -87,6 +100,8 @@ export class DomUiBridge implements UiControls {
         this.skinHandler?.(skin);
       });
     });
+
+    this.refreshChatToggleLabel();
   }
 
   private emitChat(): void {
@@ -102,5 +117,27 @@ export class DomUiBridge implements UiControls {
     this.sendHandler(value);
     this.elements.chatInput.value = '';
     this.elements.chatInput.focus();
+  }
+
+  private toggleChatPanel(forceState?: boolean): void {
+    const next = forceState ?? !this.chatCollapsed;
+    this.chatCollapsed = next;
+    this.elements.chatPanel.classList.toggle('collapsed', this.chatCollapsed);
+
+    if (!this.chatCollapsed) {
+      this.unreadCount = 0;
+      this.elements.chatInput.focus();
+    }
+
+    this.refreshChatToggleLabel();
+  }
+
+  private refreshChatToggleLabel(): void {
+    if (this.chatCollapsed) {
+      this.elements.chatToggleButton.textContent = this.unreadCount > 0 ? `Chat (${this.unreadCount})` : 'Chat';
+      return;
+    }
+
+    this.elements.chatToggleButton.textContent = 'Hide';
   }
 }

@@ -1,0 +1,46 @@
+{
+  "startedAt": "2026-03-11T03:23:02.063Z",
+  "steps": [
+    "login 2 clients and enter farm",
+    "move both clients to farm plots",
+    "A selects crop and plants 3 plots",
+    "A waters and fertilizes wheat plot",
+    "B verifies sync on same plots",
+    "wait accelerated growth and harvest wheat",
+    "B verifies harvest synced",
+    "chat collapse and unread count check"
+  ],
+  "clientA": {
+    "room": "Room lobby-1:farm | Online 2",
+    "prePlantHint": "Press E to choose crop for West A2",
+    "plantHints": [
+      "Press E to care Carrot (- / -)",
+      "Press E to care Potato (- / -)",
+      "Press E to care Wheat (- / -)"
+    ],
+    "careHints": {
+      "waterHint": "Press E to care Wheat (W / -)",
+      "fertilizeHint": "Wheat is growing at West A1"
+    },
+    "afterBoostHints": {
+      "wheatAfterBoost": "Press E to harvest Wheat at West A1",
+      "carrotAfterBoost": "Press E to care Carrot (- / -)"
+    },
+    "coinsAfterHarvest": "Coins 2",
+    "chatCollapsed": true,
+    "chatToggleTextWhileCollapsed": "Chat (1)",
+    "chatExpanded": true,
+    "chatHasMessage": true
+  },
+  "clientB": {
+    "room": "Room lobby-1:farm | Online 2",
+    "syncHintsAfterPlant": [
+      "Press E to care Carrot (- / -)",
+      "Press E to care Potato (- / -)",
+      "Wheat is growing at West A1"
+    ],
+    "afterHarvestHint": "Press E to choose crop for West A1"
+  },
+  "errors": [],
+  "endedAt": "2026-03-11T03:24:00.933Z"
+}

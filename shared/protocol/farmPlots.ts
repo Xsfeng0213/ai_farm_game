@@ -15,5 +15,12 @@ export const FARM_PLOT_IDS = [
 
 export type FarmPlotId = (typeof FARM_PLOT_IDS)[number];
 
-export const FARM_GROWTH_MS = 6500;
+export const FARM_CROP_GROWTH_MS = {
+  wheat: 16000,
+  carrot: 22000,
+  potato: 28000
+} as const;
+
+export const FARM_WATER_REDUCE_RATIO = 0.28;
+export const FARM_FERTILIZE_REDUCE_RATIO = 0.46;
 export const FARM_HARVEST_COINS = 2;

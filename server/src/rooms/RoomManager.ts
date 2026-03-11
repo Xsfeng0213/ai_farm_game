@@ -16,7 +16,13 @@
   RoomId,
   RoomStatePayload
 } from '../../../shared/protocol/events';
-import { FARM_GROWTH_MS, FARM_HARVEST_COINS, FARM_PLOT_IDS } from '../../../shared/protocol/farmPlots';
+import {
+  FARM_CROP_GROWTH_MS,
+  FARM_FERTILIZE_REDUCE_RATIO,
+  FARM_HARVEST_COINS,
+  FARM_PLOT_IDS,
+  FARM_WATER_REDUCE_RATIO
+} from '../../../shared/protocol/farmPlots';
 
 interface PlayerRecord extends PlayerSnapshot {
   socketId: string;
@@ -26,7 +32,6 @@ interface FarmPlotRecord extends FarmPlotSnapshot {}
 
 const ROOM_FALLBACK: RoomId = 'lobby-1';
 const MAX_MESSAGE_LENGTH = 120;
-const CROP_TYPES: CropType[] = ['wheat', 'potato', 'carrot'];
 
 export class RoomManager {
   private readonly players = new Map<string, PlayerRecord>();
@@ -191,11 +196,19 @@ export class RoomManager {
       plot.readyAt = undefined;
     }
 
-    if (plot.state === 'empty') {
+    if (payload.action === 'plant') {
+      const cropType = this.isCropType(payload.cropType) ? payload.cropType : null;
+      if (plot.state !== 'empty' || !cropType) {
+        return null;
+      }
+
       plot.state = 'planted';
-      plot.cropType = this.pickCropType(plot.id);
+      plot.cropType = cropType;
       plot.plantedBy = player.id;
-      plot.readyAt = now + FARM_GROWTH_MS;
+      plot.plantedAt = now;
+      plot.readyAt = now + FARM_CROP_GROWTH_MS[cropType];
+      plot.watered = false;
+      plot.fertilized = false;
       plot.updatedAt = now;
 
       return {
@@ -208,14 +221,63 @@ export class RoomManager {
       };
     }
 
-    if (plot.state !== 'harvestable') {
+    if (payload.action === 'water') {
+      if (plot.state !== 'planted' || !plot.readyAt || plot.watered) {
+        return null;
+      }
+
+      plot.watered = true;
+      plot.readyAt = this.applyGrowthBoost(plot.readyAt, now, FARM_WATER_REDUCE_RATIO);
+      if (plot.readyAt <= now) {
+        plot.state = 'harvestable';
+        plot.readyAt = undefined;
+      }
+      plot.updatedAt = now;
+
+      return {
+        roomId: player.roomId,
+        plot: { ...plot },
+        action: 'watered',
+        actorId: player.id,
+        actorCoins: player.coins,
+        serverTime: now
+      };
+    }
+
+    if (payload.action === 'fertilize') {
+      if (plot.state !== 'planted' || !plot.readyAt || plot.fertilized) {
+        return null;
+      }
+
+      plot.fertilized = true;
+      plot.readyAt = this.applyGrowthBoost(plot.readyAt, now, FARM_FERTILIZE_REDUCE_RATIO);
+      if (plot.readyAt <= now) {
+        plot.state = 'harvestable';
+        plot.readyAt = undefined;
+      }
+      plot.updatedAt = now;
+
+      return {
+        roomId: player.roomId,
+        plot: { ...plot },
+        action: 'fertilized',
+        actorId: player.id,
+        actorCoins: player.coins,
+        serverTime: now
+      };
+    }
+
+    if (payload.action !== 'harvest' || plot.state !== 'harvestable') {
       return null;
     }
 
     plot.state = 'empty';
     plot.cropType = undefined;
     plot.plantedBy = undefined;
+    plot.plantedAt = undefined;
     plot.readyAt = undefined;
+    plot.watered = undefined;
+    plot.fertilized = undefined;
     plot.updatedAt = now;
     player.coins += FARM_HARVEST_COINS;
 
@@ -349,8 +411,18 @@ export class RoomManager {
     return roomId.endsWith(':farm');
   }
 
-  private pickCropType(plotId: FarmPlotSnapshot['id']): CropType {
-    const index = FARM_PLOT_IDS.indexOf(plotId);
-    return CROP_TYPES[(index >= 0 ? index : 0) % CROP_TYPES.length];
+  private applyGrowthBoost(readyAt: number, now: number, ratio: number): number {
+    const remaining = Math.max(readyAt - now, 0);
+    if (remaining === 0) {
+      return now;
+    }
+
+    const reduced = Math.max(Math.floor(remaining * ratio), 1200);
+    const boostedRemaining = Math.max(remaining - reduced, 0);
+    return now + boostedRemaining;
+  }
+
+  private isCropType(value: string | undefined): value is CropType {
+    return value === 'wheat' || value === 'carrot' || value === 'potato';
   }
 }

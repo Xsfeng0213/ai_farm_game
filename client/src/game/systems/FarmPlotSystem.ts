@@ -1,4 +1,4 @@
-﻿import Phaser from 'phaser';
+import Phaser from 'phaser';
 import type { CropType, FarmPlotSnapshot, FarmPlotState } from '../../types/protocol';
 import { FARM_PLOT_DEFS, FARM_PLOT_INTERACT_RADIUS } from '../config/farmPlotConfig';
 
@@ -9,9 +9,13 @@ interface FarmPlotRuntime {
   y: number;
   state: FarmPlotState;
   cropType?: CropType;
+  watered: boolean;
+  fertilized: boolean;
   bed: Phaser.GameObjects.Image;
   crop: Phaser.GameObjects.Image;
   outline: Phaser.GameObjects.Rectangle;
+  waterBadge: Phaser.GameObjects.Container;
+  fertilizeBadge: Phaser.GameObjects.Container;
   bedPulse: Phaser.Tweens.Tween | null;
   cropSway: Phaser.Tweens.Tween | null;
 }
@@ -20,8 +24,12 @@ export interface FarmPlotCandidate {
   plotId: FarmPlotSnapshot['id'];
   label: string;
   state: FarmPlotState;
-  action: 'plant' | 'harvest' | null;
+  action: 'plant_menu' | 'care_menu' | 'harvest' | null;
   cropType?: CropType;
+  watered: boolean;
+  fertilized: boolean;
+  canWater: boolean;
+  canFertilize: boolean;
 }
 
 const BED_TEXTURE_BY_STATE: Record<FarmPlotState, string> = {
@@ -72,15 +80,22 @@ export class FarmPlotSystem {
         .setDepth(def.y + 5)
         .setVisible(false);
 
+      const waterBadge = this.createBadge(def.x - 22, def.y - 30, 'W', 0x2d5b8f);
+      const fertilizeBadge = this.createBadge(def.x + 22, def.y - 30, 'F', 0x6f5134);
+
       this.plots.set(def.id, {
         id: def.id,
         label: def.label,
         x: def.x,
         y: def.y,
         state: 'empty',
+        watered: false,
+        fertilized: false,
         bed,
         crop,
         outline,
+        waterBadge,
+        fertilizeBadge,
         bedPulse: null,
         cropSway: null
       });
@@ -130,11 +145,16 @@ export class FarmPlotSystem {
 
     this.setHighlight(nearestId);
 
-    let action: 'plant' | 'harvest' | null = null;
+    const canWater = nearest.state === 'planted' && !nearest.watered;
+    const canFertilize = nearest.state === 'planted' && !nearest.fertilized;
+
+    let action: FarmPlotCandidate['action'] = null;
     if (nearest.state === 'empty') {
-      action = 'plant';
+      action = 'plant_menu';
     } else if (nearest.state === 'harvestable') {
       action = 'harvest';
+    } else if (canWater || canFertilize) {
+      action = 'care_menu';
     }
 
     return {
@@ -142,7 +162,11 @@ export class FarmPlotSystem {
       label: nearest.label,
       state: nearest.state,
       action,
-      cropType: nearest.cropType
+      cropType: nearest.cropType,
+      watered: nearest.watered,
+      fertilized: nearest.fertilized,
+      canWater,
+      canFertilize
     };
   }
 
@@ -186,6 +210,29 @@ export class FarmPlotSystem {
     });
   }
 
+  pulsePlot(plotId: FarmPlotSnapshot['id'], strokeColor = 0xffd074): void {
+    const plot = this.plots.get(plotId);
+    if (!plot) {
+      return;
+    }
+
+    plot.outline.setStrokeStyle(3, strokeColor, 1).setVisible(true).setAlpha(1);
+    this.scene.tweens.add({
+      targets: plot.outline,
+      alpha: 0,
+      duration: 220,
+      ease: 'Quad.Out',
+      onComplete: () => {
+        if (this.highlightedId !== plot.id) {
+          plot.outline.setVisible(false).setAlpha(1);
+          return;
+        }
+
+        plot.outline.setVisible(true).setAlpha(1);
+      }
+    });
+  }
+
   private applyPlotSnapshot(snapshot: FarmPlotSnapshot): void {
     const runtime = this.plots.get(snapshot.id);
     if (!runtime) {
@@ -194,10 +241,16 @@ export class FarmPlotSystem {
 
     runtime.state = snapshot.state;
     runtime.cropType = snapshot.cropType;
+    runtime.watered = Boolean(snapshot.watered);
+    runtime.fertilized = Boolean(snapshot.fertilized);
 
     runtime.bed.setTexture(BED_TEXTURE_BY_STATE[snapshot.state]);
 
     this.stopPlotTweens(runtime);
+
+    const showCareBadges = snapshot.state !== 'empty';
+    runtime.waterBadge.setVisible(showCareBadges && runtime.watered);
+    runtime.fertilizeBadge.setVisible(showCareBadges && runtime.fertilized);
 
     if (snapshot.state === 'empty' || !snapshot.cropType) {
       runtime.crop.setVisible(false);
@@ -231,6 +284,12 @@ export class FarmPlotSystem {
         duration: 300,
         ease: 'Sine.InOut'
       });
+    } else if (runtime.fertilized) {
+      runtime.bed.setTint(0xb98d55);
+      runtime.bed.setAlpha(1);
+    } else if (runtime.watered) {
+      runtime.bed.setTint(0x7ca8c7);
+      runtime.bed.setAlpha(1);
     } else {
       runtime.bed.clearTint();
       runtime.bed.setAlpha(1);
@@ -287,5 +346,18 @@ export class FarmPlotSystem {
     plot.cropSway = null;
     plot.bed.setAlpha(1);
     plot.crop.setY(plot.y - 6);
+  }
+
+  private createBadge(x: number, y: number, label: string, color: number): Phaser.GameObjects.Container {
+    const box = this.scene.add.rectangle(0, 0, 14, 12, color, 0.94).setStrokeStyle(1, 0xf0d8a8, 0.9);
+    const text = this.scene.add
+      .text(0, 0, label, {
+        fontFamily: 'monospace',
+        fontSize: '9px',
+        color: '#f8f0d8'
+      })
+      .setOrigin(0.5);
+
+    return this.scene.add.container(x, y, [box, text]).setDepth(y + 10).setVisible(false);
   }
 }
