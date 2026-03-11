@@ -1,5 +1,6 @@
 ﻿import Phaser from 'phaser';
 import type {
+  CropType,
   ChatMessagePayload,
   FacingDirection,
   InteractionStatePayload,
@@ -8,6 +9,7 @@ import type {
   RoomStatePayload
 } from '../../types/protocol';
 import { LOBBY_CONFIG } from '../config/lobbyConfig';
+import { EMPTY_CROP_INVENTORY } from '../config/cropCatalog';
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { lobbyRoomId } from '../network/roomIds';
@@ -41,6 +43,7 @@ export class LobbyScene extends Phaser.Scene {
   private direction: FacingDirection = 'down';
   private state: MovePayload['state'] = 'idle';
   private coins = 0;
+  private inventory: Record<CropType, number> = { ...EMPTY_CROP_INVENTORY };
   private selectedSkin: PlayerSkin = 'skin1';
   private pendingTransition: SceneSessionData['local'] | null = null;
 
@@ -65,6 +68,7 @@ export class LobbyScene extends Phaser.Scene {
       this.direction = data.session.local.direction;
       this.state = data.session.local.state;
       this.coins = data.session.local.coins;
+      this.inventory = { ...EMPTY_CROP_INVENTORY, ...(data.session.local.inventory ?? {}) };
     }
 
     this.buildWorld();
@@ -85,6 +89,7 @@ export class LobbyScene extends Phaser.Scene {
     });
 
     this.ui.updateCoins(this.coins);
+    this.ui.setInventoryVisible(false);
     this.ui.showHint('Use WASD / Arrow keys to move');
     this.ui.appendChat('[system] Lobby connected');
     this.syncRoomHud();
@@ -462,7 +467,8 @@ export class LobbyScene extends Phaser.Scene {
         direction: 'down',
         state: 'idle',
         coins: this.coins,
-        skin: this.selectedSkin
+        skin: this.selectedSkin,
+        inventory: { ...this.inventory }
       },
       remotes: []
     };

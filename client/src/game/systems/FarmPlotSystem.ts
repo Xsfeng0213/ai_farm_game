@@ -9,6 +9,7 @@ interface FarmPlotRuntime {
   y: number;
   state: FarmPlotState;
   cropType?: CropType;
+  readyAt?: number;
   watered: boolean;
   fertilized: boolean;
   bed: Phaser.GameObjects.Image;
@@ -26,6 +27,7 @@ export interface FarmPlotCandidate {
   state: FarmPlotState;
   action: 'plant_menu' | 'care_menu' | 'harvest' | null;
   cropType?: CropType;
+  readyAt?: number;
   watered: boolean;
   fertilized: boolean;
   canWater: boolean;
@@ -89,6 +91,7 @@ export class FarmPlotSystem {
         x: def.x,
         y: def.y,
         state: 'empty',
+        readyAt: undefined,
         watered: false,
         fertilized: false,
         bed,
@@ -163,6 +166,7 @@ export class FarmPlotSystem {
       state: nearest.state,
       action,
       cropType: nearest.cropType,
+      readyAt: nearest.readyAt,
       watered: nearest.watered,
       fertilized: nearest.fertilized,
       canWater,
@@ -241,6 +245,7 @@ export class FarmPlotSystem {
 
     runtime.state = snapshot.state;
     runtime.cropType = snapshot.cropType;
+    runtime.readyAt = snapshot.readyAt;
     runtime.watered = Boolean(snapshot.watered);
     runtime.fertilized = Boolean(snapshot.fertilized);
 

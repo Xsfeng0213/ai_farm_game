@@ -1,4 +1,4 @@
-import type { FacingDirection, PlayerSnapshot, PlayerState } from '../../types/protocol';
+import type { CropType, FacingDirection, PlayerSnapshot, PlayerState } from '../../types/protocol';
 import type { PlayerSkin } from './playerSkin';
 
 interface Position {
@@ -14,6 +14,7 @@ export interface LocalPlayerSession {
   state: PlayerState;
   coins: number;
   skin: PlayerSkin;
+  inventory?: Record<CropType, number>;
 }
 
 export interface SceneSessionData {

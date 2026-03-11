@@ -114,6 +114,9 @@ export interface FarmPlotUpdatedPayload {
   action: 'planted' | 'watered' | 'fertilized' | 'grown' | 'harvested';
   actorId?: PlayerId;
   actorCoins?: number;
+  harvestCropType?: CropType;
+  harvestAmount?: number;
+  harvestCoins?: number;
   serverTime: number;
 }
 

@@ -12,12 +12,14 @@ import type {
   RoomStatePayload
 } from '../../types/protocol';
 import { FARM_CONFIG } from '../config/farmConfig';
+import { CROP_CATALOG, EMPTY_CROP_INVENTORY } from '../config/cropCatalog';
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { farmRoomId } from '../network/roomIds';
 import { PlayerStateMachine } from '../state/PlayerStateMachine';
 import { FarmPlotSystem } from '../systems/FarmPlotSystem';
 import { InputSystem } from '../systems/InputSystem';
+import type { InventoryViewItem } from '../types/game';
 import type { PlayerSkin } from '../types/playerSkin';
 import type { SceneSessionData, SceneStartPayload } from '../types/sceneSession';
 import { FarmActionPanel } from '../ui/FarmActionPanel';
@@ -50,6 +52,7 @@ export class FarmScene extends Phaser.Scene {
   private direction: FacingDirection = 'down';
   private state: MovePayload['state'] = 'idle';
   private coins = 0;
+  private inventory: Record<CropType, number> = { ...EMPTY_CROP_INVENTORY };
   private selectedSkin: PlayerSkin = 'skin1';
   private pendingTransition: SceneSessionData['local'] | null = null;
 
@@ -75,6 +78,7 @@ export class FarmScene extends Phaser.Scene {
       this.direction = data.session.local.direction;
       this.state = data.session.local.state;
       this.coins = data.session.local.coins;
+      this.inventory = { ...EMPTY_CROP_INVENTORY, ...(data.session.local.inventory ?? {}) };
     }
 
     this.buildWorld();
@@ -97,6 +101,8 @@ export class FarmScene extends Phaser.Scene {
     });
 
     this.ui.updateCoins(this.coins);
+    this.ui.setInventoryVisible(true);
+    this.updateInventoryUi();
     this.ui.showHint('Farm ready. Press E near field to interact');
     this.ui.appendChat('[system] Entered farm map');
     this.syncRoomHud();
@@ -132,6 +138,7 @@ export class FarmScene extends Phaser.Scene {
     this.lastFarmActionAt = 0;
     this.direction = 'down';
     this.state = 'idle';
+    this.inventory = { ...EMPTY_CROP_INVENTORY };
     this.inputSystem = null;
     this.farmPlotSystem = null;
     this.interactKey = null;
@@ -267,7 +274,22 @@ export class FarmScene extends Phaser.Scene {
         this.farmPlotSystem?.showFloatingText(payload.plot.id, `${cropLabel} ready`, '#ffe48f');
       } else if (payload.action === 'harvested') {
         this.farmPlotSystem?.pulsePlot(payload.plot.id, 0xffdd8b);
-        this.farmPlotSystem?.showFloatingText(payload.plot.id, '+2 coins', '#ffe58b');
+        const coinText = typeof payload.harvestCoins === 'number' ? `+${payload.harvestCoins} coins` : '+coins';
+        this.farmPlotSystem?.showFloatingText(payload.plot.id, coinText, '#ffe58b');
+
+        if (
+          payload.actorId === this.selfId &&
+          payload.harvestCropType &&
+          typeof payload.harvestAmount === 'number' &&
+          payload.harvestAmount > 0
+        ) {
+          this.addToInventory(payload.harvestCropType, payload.harvestAmount);
+          this.farmPlotSystem?.showFloatingText(
+            payload.plot.id,
+            `+${payload.harvestAmount} ${this.cropLabel(payload.harvestCropType)}`,
+            '#d0f2a4'
+          );
+        }
       }
     });
   }
@@ -402,15 +424,17 @@ export class FarmScene extends Phaser.Scene {
     if (candidate.action === 'plant_menu') {
       this.ui.showHint(`Press E to choose crop for ${candidate.label}`);
     } else if (candidate.action === 'care_menu') {
+      const remain = this.formatRemainingSeconds(candidate.readyAt, now);
       this.ui.showHint(
-        `Press E to care ${this.cropLabel(candidate.cropType)} (${candidate.watered ? 'W' : '-'} / ${candidate.fertilized ? 'F' : '-'})`
+        `Press E to care ${this.cropLabel(candidate.cropType)} | ${remain} | W:${candidate.watered ? 'Y' : 'N'} F:${candidate.fertilized ? 'Y' : 'N'}`
       );
     } else if (candidate.action === 'harvest') {
       this.hideActionPanel();
       this.ui.showHint(`Press E to harvest ${this.cropLabel(candidate.cropType)} at ${candidate.label}`);
     } else {
       this.hideActionPanel();
-      this.ui.showHint(`${this.cropLabel(candidate.cropType)} is growing at ${candidate.label}`);
+      const remain = this.formatRemainingSeconds(candidate.readyAt, now);
+      this.ui.showHint(`${this.cropLabel(candidate.cropType)} growing at ${candidate.label} | ${remain}`);
     }
 
     if (!this.interactKey || !Phaser.Input.Keyboard.JustDown(this.interactKey)) {
@@ -547,6 +571,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.hideActionPanel();
     this.isTransitioning = true;
+    this.ui.setInventoryVisible(false);
     this.ui.showHint('Returning to lobby...');
     this.state = this.stateMachine.reset('idle', Date.now());
     this.localPlayer?.setVisualState(this.direction, this.state);
@@ -624,10 +649,37 @@ export class FarmScene extends Phaser.Scene {
         direction: 'down',
         state: 'idle',
         coins: this.coins,
-        skin: this.selectedSkin
+        skin: this.selectedSkin,
+        inventory: { ...this.inventory }
       },
       remotes: []
     };
+  }
+
+  private addToInventory(cropType: CropType, amount: number): void {
+    this.inventory[cropType] = (this.inventory[cropType] ?? 0) + amount;
+    this.updateInventoryUi();
+  }
+
+  private updateInventoryUi(): void {
+    const items: InventoryViewItem[] = (Object.keys(CROP_CATALOG) as CropType[]).map((cropType) => ({
+      cropType,
+      label: CROP_CATALOG[cropType].label,
+      description: CROP_CATALOG[cropType].description,
+      icon: CROP_CATALOG[cropType].icon,
+      count: this.inventory[cropType] ?? 0
+    }));
+
+    this.ui.updateInventory(items);
+  }
+
+  private formatRemainingSeconds(readyAt: number | undefined, now: number): string {
+    if (!readyAt) {
+      return 'Timer -';
+    }
+
+    const seconds = Math.max(0, Math.ceil((readyAt - now) / 1000));
+    return `${seconds}s`;
   }
 
   private cropLabel(cropType: CropType | undefined): string {
@@ -635,14 +687,6 @@ export class FarmScene extends Phaser.Scene {
       return 'Crop';
     }
 
-    if (cropType === 'wheat') {
-      return 'Wheat';
-    }
-
-    if (cropType === 'potato') {
-      return 'Potato';
-    }
-
-    return 'Carrot';
+    return CROP_CATALOG[cropType].label;
   }
 }

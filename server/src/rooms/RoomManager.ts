@@ -18,8 +18,8 @@
 } from '../../../shared/protocol/events';
 import {
   FARM_CROP_GROWTH_MS,
+  FARM_CROP_HARVEST,
   FARM_FERTILIZE_REDUCE_RATIO,
-  FARM_HARVEST_COINS,
   FARM_PLOT_IDS,
   FARM_WATER_REDUCE_RATIO
 } from '../../../shared/protocol/farmPlots';
@@ -271,6 +271,12 @@ export class RoomManager {
       return null;
     }
 
+    const harvestedCropType = plot.cropType;
+    if (!harvestedCropType) {
+      return null;
+    }
+
+    const reward = FARM_CROP_HARVEST[harvestedCropType];
     plot.state = 'empty';
     plot.cropType = undefined;
     plot.plantedBy = undefined;
@@ -279,7 +285,7 @@ export class RoomManager {
     plot.watered = undefined;
     plot.fertilized = undefined;
     plot.updatedAt = now;
-    player.coins += FARM_HARVEST_COINS;
+    player.coins += reward.coins;
 
     return {
       roomId: player.roomId,
@@ -287,6 +293,9 @@ export class RoomManager {
       action: 'harvested',
       actorId: player.id,
       actorCoins: player.coins,
+      harvestCropType: harvestedCropType,
+      harvestAmount: reward.amount,
+      harvestCoins: reward.coins,
       serverTime: now
     };
   }

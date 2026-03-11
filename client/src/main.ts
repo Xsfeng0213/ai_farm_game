@@ -32,6 +32,21 @@ app.innerHTML = `
         <span id="hint-label" class="hint-label">Input nickname to enter</span>
       </section>
 
+      <button id="inventory-toggle-btn" class="pixel-frame inventory-toggle-btn is-hidden" type="button">Bag</button>
+
+      <section id="inventory-panel" class="pixel-frame inventory-panel is-hidden">
+        <div class="inventory-head">
+          <div class="inventory-header">Backpack</div>
+          <div class="inventory-size">8 x 6</div>
+        </div>
+        <div id="inventory-grid" class="inventory-grid"></div>
+        <aside id="inventory-tooltip" class="inventory-tooltip is-hidden">
+          <div id="inventory-tooltip-title" class="inventory-tooltip-title">Crop</div>
+          <div id="inventory-tooltip-count" class="inventory-tooltip-count">Qty 0</div>
+          <div id="inventory-tooltip-desc" class="inventory-tooltip-desc">Harvest to store crops.</div>
+        </aside>
+      </section>
+
       <section id="chat-panel" class="pixel-frame chat-panel">
         <div class="chat-head-row">
           <div class="chat-header">Lobby Chat</div>
@@ -64,6 +79,13 @@ app.innerHTML = `
 const roomLabel = document.querySelector<HTMLElement>('#room-label');
 const coinsLabel = document.querySelector<HTMLElement>('#coins-label');
 const hintLabel = document.querySelector<HTMLElement>('#hint-label');
+const inventoryToggleButton = document.querySelector<HTMLButtonElement>('#inventory-toggle-btn');
+const inventoryPanel = document.querySelector<HTMLElement>('#inventory-panel');
+const inventoryGrid = document.querySelector<HTMLElement>('#inventory-grid');
+const inventoryTooltip = document.querySelector<HTMLElement>('#inventory-tooltip');
+const inventoryTooltipTitle = document.querySelector<HTMLElement>('#inventory-tooltip-title');
+const inventoryTooltipCount = document.querySelector<HTMLElement>('#inventory-tooltip-count');
+const inventoryTooltipDesc = document.querySelector<HTMLElement>('#inventory-tooltip-desc');
 const chatList = document.querySelector<HTMLElement>('#chat-list');
 const chatInput = document.querySelector<HTMLInputElement>('#chat-input');
 const sendButton = document.querySelector<HTMLButtonElement>('#send-btn');
@@ -80,6 +102,13 @@ if (
   !roomLabel ||
   !coinsLabel ||
   !hintLabel ||
+  !inventoryToggleButton ||
+  !inventoryPanel ||
+  !inventoryGrid ||
+  !inventoryTooltip ||
+  !inventoryTooltipTitle ||
+  !inventoryTooltipCount ||
+  !inventoryTooltipDesc ||
   !chatList ||
   !chatInput ||
   !sendButton ||
@@ -98,6 +127,13 @@ const ui = new DomUiBridge({
   roomLabel,
   coinsLabel,
   hintLabel,
+  inventoryToggleButton,
+  inventoryPanel,
+  inventoryGrid,
+  inventoryTooltip,
+  inventoryTooltipTitle,
+  inventoryTooltipCount,
+  inventoryTooltipDesc,
   chatList,
   chatInput,
   sendButton,
@@ -128,7 +164,9 @@ const joinGame = (): void => {
     serverUrl: SERVER_URL,
     ui
   });
-  (window as Window & { __AI_FARM_GAME__?: unknown }).__AI_FARM_GAME__ = game;
+  if (import.meta.env.DEV) {
+    (window as Window & { __AI_FARM_GAME__?: unknown }).__AI_FARM_GAME__ = game;
+  }
 
   gameStarted = true;
   loginOverlay.classList.add('hidden');

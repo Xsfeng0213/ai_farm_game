@@ -1,4 +1,4 @@
-import type { InteractionTarget, PlayerState } from '../../types/protocol';
+import type { CropType, InteractionTarget, PlayerState } from '../../types/protocol';
 import type { PlayerSkin } from './playerSkin';
 
 export interface InteractableDef {
@@ -18,6 +18,16 @@ export interface UiBridge {
   updateCoins: (coins: number) => void;
   appendChat: (message: string) => void;
   showHint: (message: string) => void;
+  setInventoryVisible: (visible: boolean) => void;
+  updateInventory: (items: InventoryViewItem[]) => void;
+}
+
+export interface InventoryViewItem {
+  cropType: CropType;
+  label: string;
+  count: number;
+  description: string;
+  icon: string;
 }
 
 export interface UiControls extends UiBridge {

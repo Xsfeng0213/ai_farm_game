@@ -21,6 +21,17 @@ export const FARM_CROP_GROWTH_MS = {
   potato: 28000
 } as const;
 
+export const FARM_CROP_LABELS = {
+  wheat: 'Wheat',
+  carrot: 'Carrot',
+  potato: 'Potato'
+} as const;
+
+export const FARM_CROP_HARVEST = {
+  wheat: { coins: 2, amount: 3 },
+  carrot: { coins: 3, amount: 2 },
+  potato: { coins: 4, amount: 2 }
+} as const;
+
 export const FARM_WATER_REDUCE_RATIO = 0.28;
 export const FARM_FERTILIZE_REDUCE_RATIO = 0.46;
-export const FARM_HARVEST_COINS = 2;

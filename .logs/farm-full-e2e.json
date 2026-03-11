@@ -1,0 +1,63 @@
+{
+  "startedAt": "2026-03-11T05:05:49.931Z",
+  "steps": [
+    "login and enter farm",
+    "move both clients near west plots",
+    "A selects crops and plants carrot/potato/wheat",
+    "A waters and fertilizes wheat and potato",
+    "B checks synced crop status",
+    "wait then harvest wheat first",
+    "open bag and check 8x6 grid",
+    "wait more then harvest potato",
+    "B confirms harvested sync",
+    "chat collapse and unread"
+  ],
+  "clientA": {
+    "room": "Room lobby-1:farm | Online 2",
+    "plantHints": {
+      "plantCarrot": "Press E to care Carrot | 22s | W:N F:N",
+      "plantPotato": "Press E to care Potato | 28s | W:N F:N",
+      "plantWheat": "Press E to care Wheat | 16s | W:N F:N"
+    },
+    "careHints": {
+      "wheatWater": "Press E to care Wheat | 11s | W:Y F:N",
+      "wheatFertilize": "Wheat growing at West A1 | 5s",
+      "potatoWater": "Press E to care Potato | 15s | W:Y F:N",
+      "potatoFertilize": "Potato growing at West A3 | 7s"
+    },
+    "harvestChecks": {
+      "wheatReadyHint": "Press E to harvest Potato at West A3",
+      "coinsAfterWheat": "Coins 2",
+      "bagSlotCount": 48,
+      "wheatFilledSlots": 1,
+      "wheatTooltip": {
+        "title": "Wheat",
+        "qty": "Qty 3"
+      },
+      "potatoReadyHint": "Press E to harvest Potato at West A3",
+      "coinsAfterPotato": "Coins 6",
+      "potatoTooltip": {
+        "title": "Potato",
+        "qty": "Qty 2",
+        "desc": "Slowest growth, but highest coin reward per harvest."
+      },
+      "tooltipClosedAfterSecondClick": true,
+      "carrotStillGrowingHint": "Press E to harvest Carrot at West A2"
+    },
+    "bagClosed": true,
+    "chatCollapsed": true,
+    "chatToggleTextWhileCollapsed": "Chat (1)",
+    "chatExpanded": true
+  },
+  "clientB": {
+    "room": "Room lobby-1:farm | Online 2",
+    "syncedHints": {
+      "bCarrotHint": "Press E to care Carrot | 11s | W:N F:N",
+      "bPotatoHint": "Potato growing at West A3 | 6s",
+      "bWheatHint": "Press E to harvest Wheat at West A1"
+    },
+    "afterHarvestHint": "Press E to harvest Carrot at West A2"
+  },
+  "errors": [],
+  "endedAt": "2026-03-11T05:07:02.562Z"
+}
