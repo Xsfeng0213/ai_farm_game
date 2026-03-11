@@ -1,13 +1,21 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
-  <rect width="64" height="64" fill="#2e2016"/>
-  <rect x="2" y="2" width="60" height="60" fill="#543523"/>
-  <rect x="4" y="4" width="56" height="56" fill="#65402a"/>
-  <rect x="6" y="10" width="52" height="4" fill="#4a2f20"/>
-  <rect x="6" y="22" width="52" height="4" fill="#4a2f20"/>
-  <rect x="6" y="34" width="52" height="4" fill="#4a2f20"/>
-  <rect x="6" y="46" width="52" height="4" fill="#4a2f20"/>
-  <rect x="8" y="12" width="48" height="2" fill="#7a5136"/>
-  <rect x="8" y="24" width="48" height="2" fill="#7a5136"/>
-  <rect x="8" y="36" width="48" height="2" fill="#7a5136"/>
-  <rect x="8" y="48" width="48" height="2" fill="#7a5136"/>
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72" shape-rendering="crispEdges">
+  <rect width="72" height="72" fill="#2a1c13"/>
+  <rect x="2" y="2" width="68" height="68" fill="#4f3422"/>
+  <rect x="4" y="4" width="64" height="64" fill="#613f2a"/>
+  <rect x="6" y="11" width="60" height="5" fill="#422b1d"/>
+  <rect x="6" y="23" width="60" height="5" fill="#422b1d"/>
+  <rect x="6" y="35" width="60" height="5" fill="#422b1d"/>
+  <rect x="6" y="47" width="60" height="5" fill="#422b1d"/>
+  <rect x="6" y="59" width="60" height="5" fill="#422b1d"/>
+  <rect x="10" y="14" width="4" height="2" fill="#7bbb62"/>
+  <rect x="18" y="15" width="4" height="2" fill="#78b55f"/>
+  <rect x="28" y="14" width="4" height="2" fill="#80c066"/>
+  <rect x="38" y="15" width="4" height="2" fill="#7dbc64"/>
+  <rect x="50" y="14" width="4" height="2" fill="#76b15d"/>
+  <rect x="58" y="15" width="4" height="2" fill="#80be67"/>
+  <rect x="12" y="27" width="3" height="2" fill="#77b25f"/>
+  <rect x="24" y="27" width="3" height="2" fill="#7dbe65"/>
+  <rect x="35" y="27" width="3" height="2" fill="#73ad5a"/>
+  <rect x="46" y="27" width="3" height="2" fill="#7ebf66"/>
+  <rect x="57" y="27" width="3" height="2" fill="#74b05c"/>
 </svg>

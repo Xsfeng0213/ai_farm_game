@@ -50,6 +50,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('crop_carrot_planted', '/assets/farm/crop_carrot_planted.svg');
     this.load.image('crop_carrot_harvestable', '/assets/farm/crop_carrot_harvestable.svg');
     this.load.image('farm_interact_arrow', '/assets/farm/farm_interact_arrow.svg');
+    this.load.image('farm_grass_clump', '/assets/farm/farm_grass_clump.svg');
   }
 
   create(): void {

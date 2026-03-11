@@ -1,0 +1,49 @@
+{
+  "startedAt": "2026-03-10T11:38:47.150Z",
+  "steps": [
+    "login both clients",
+    "move both to farm",
+    "client A plants 3 adjacent plots",
+    "client B verifies synced growing hints",
+    "wait for growth to harvestable",
+    "client A harvests 3 plots",
+    "client B verifies harvested sync"
+  ],
+  "clientA": {
+    "roomAfterLogin": "Room lobby-1:lobby | Online 2",
+    "roomInFarm": "Room lobby-1:farm | Online 2",
+    "prePlantHint": "Press E to plant on West A2",
+    "plantHints": [
+      {
+        "before": "Press E to plant on West A2",
+        "after": "Potato is growing at West A2"
+      },
+      {
+        "before": "Press E to plant on West A3",
+        "after": "Carrot is growing at West A3"
+      },
+      {
+        "before": "Press E to plant on West A1",
+        "after": "Wheat is growing at West A1"
+      }
+    ],
+    "harvestHints": [
+      "Press E to harvest Wheat at West A1",
+      "Press E to harvest Potato at West A2",
+      "Press E to harvest Wheat at West A1"
+    ],
+    "coinsAfterHarvest": "Coins 6"
+  },
+  "clientB": {
+    "roomAfterLogin": "Room lobby-1:lobby | Online 2",
+    "roomInFarm": "Room lobby-1:farm | Online 2",
+    "syncedGrowingHints": [
+      "Press E to harvest Potato at West A2",
+      "Press E to harvest Carrot at West A3",
+      "Press E to harvest Wheat at West A1"
+    ],
+    "hintAfterAHarvest": "Press E to plant on West A1"
+  },
+  "errors": [],
+  "endedAt": "2026-03-10T11:39:46.782Z"
+}

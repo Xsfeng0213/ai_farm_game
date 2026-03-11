@@ -87,6 +87,32 @@ export function buildFarmMap(scene: Phaser.Scene): void {
 
   scene.add.rectangle(394, 748, 328, 174, 0x2b2218, 0.22).setDepth(2);
   scene.add.rectangle(874, 748, 328, 174, 0x2b2218, 0.22).setDepth(2);
+  const grassClumps = [
+    [248, 570],
+    [290, 556],
+    [532, 556],
+    [574, 570],
+    [248, 744],
+    [290, 758],
+    [532, 758],
+    [574, 744],
+    [728, 570],
+    [770, 556],
+    [1012, 556],
+    [1054, 570],
+    [728, 744],
+    [770, 758],
+    [1012, 758],
+    [1054, 744]
+  ] as const;
+
+  grassClumps.forEach(([x, y], i) => {
+    scene.add
+      .image(x, y, 'farm_grass_clump')
+      .setDepth(y + 6)
+      .setScale(i % 2 === 0 ? 1 : 1.08)
+      .setAlpha(0.9);
+  });
 
   const treePositions = [
     [132, 180],
