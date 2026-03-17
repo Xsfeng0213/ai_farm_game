@@ -13,13 +13,14 @@ import type {
 } from '../../types/protocol';
 import { FARM_CONFIG } from '../config/farmConfig';
 import { CROP_CATALOG, EMPTY_CROP_INVENTORY } from '../config/cropCatalog';
+import { EMPTY_HARVEST_TOTALS, FARM_TASKS, type FarmTaskDefinition } from '../config/taskCatalog';
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { farmRoomId } from '../network/roomIds';
 import { PlayerStateMachine } from '../state/PlayerStateMachine';
 import { FarmPlotSystem } from '../systems/FarmPlotSystem';
 import { InputSystem } from '../systems/InputSystem';
-import type { InventoryViewItem } from '../types/game';
+import type { InventoryActionRequest, InventoryViewItem, TaskViewItem } from '../types/game';
 import type { PlayerSkin } from '../types/playerSkin';
 import type { SceneSessionData, SceneStartPayload } from '../types/sceneSession';
 import { FarmActionPanel } from '../ui/FarmActionPanel';
@@ -51,8 +52,11 @@ export class FarmScene extends Phaser.Scene {
 
   private direction: FacingDirection = 'down';
   private state: MovePayload['state'] = 'idle';
-  private coins = 0;
+  private serverCoins = 0;
+  private localBonusCoins = 0;
   private inventory: Record<CropType, number> = { ...EMPTY_CROP_INVENTORY };
+  private harvestTotals: Record<CropType, number> = { ...EMPTY_HARVEST_TOTALS };
+  private readonly completedTaskIds = new Set<string>();
   private selectedSkin: PlayerSkin = 'skin1';
   private pendingTransition: SceneSessionData['local'] | null = null;
 
@@ -77,8 +81,12 @@ export class FarmScene extends Phaser.Scene {
       this.selectedSkin = data.session.local.skin;
       this.direction = data.session.local.direction;
       this.state = data.session.local.state;
-      this.coins = data.session.local.coins;
+      this.serverCoins = data.session.local.coins;
+      this.localBonusCoins = data.session.local.bonusCoins ?? 0;
       this.inventory = { ...EMPTY_CROP_INVENTORY, ...(data.session.local.inventory ?? {}) };
+      this.harvestTotals = { ...EMPTY_HARVEST_TOTALS, ...(data.session.local.harvestTotals ?? {}) };
+      this.completedTaskIds.clear();
+      (data.session.local.completedTaskIds ?? []).forEach((id) => this.completedTaskIds.add(id));
     }
 
     this.buildWorld();
@@ -100,9 +108,11 @@ export class FarmScene extends Phaser.Scene {
       nickname: this.nickname
     });
 
-    this.ui.updateCoins(this.coins);
+    this.updateCoinsUi();
     this.ui.setInventoryVisible(true);
+    this.ui.setTaskBoardVisible(true);
     this.updateInventoryUi();
+    this.updateTaskUi();
     this.ui.showHint('Farm ready. Press E near field to interact');
     this.ui.appendChat('[system] Entered farm map');
     this.syncRoomHud();
@@ -138,7 +148,11 @@ export class FarmScene extends Phaser.Scene {
     this.lastFarmActionAt = 0;
     this.direction = 'down';
     this.state = 'idle';
+    this.serverCoins = 0;
+    this.localBonusCoins = 0;
     this.inventory = { ...EMPTY_CROP_INVENTORY };
+    this.harvestTotals = { ...EMPTY_HARVEST_TOTALS };
+    this.completedTaskIds.clear();
     this.inputSystem = null;
     this.farmPlotSystem = null;
     this.interactKey = null;
@@ -220,8 +234,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.network.onInteractionState((payload: InteractionStatePayload) => {
       if (payload.playerId === this.selfId) {
-        this.coins = payload.coins;
-        this.ui.updateCoins(this.coins);
+        this.setServerCoins(payload.coins);
         this.state = this.stateMachine.syncFromServer(payload.state, Date.now());
         this.localPlayer?.setVisualState(this.direction, this.state);
       } else {
@@ -256,8 +269,7 @@ export class FarmScene extends Phaser.Scene {
       }
 
       if (payload.actorId === this.selfId && typeof payload.actorCoins === 'number') {
-        this.coins = payload.actorCoins;
-        this.ui.updateCoins(this.coins);
+        this.setServerCoins(payload.actorCoins);
       }
 
       if (payload.action === 'planted') {
@@ -284,6 +296,7 @@ export class FarmScene extends Phaser.Scene {
           payload.harvestAmount > 0
         ) {
           this.addToInventory(payload.harvestCropType, payload.harvestAmount);
+          this.recordHarvest(payload.harvestCropType, payload.harvestAmount);
           this.farmPlotSystem?.showFloatingText(
             payload.plot.id,
             `+${payload.harvestAmount} ${this.cropLabel(payload.harvestCropType)}`,
@@ -307,6 +320,14 @@ export class FarmScene extends Phaser.Scene {
       this.selectedSkin = skin;
       this.localPlayer?.setSkin(skin);
       this.ui.showHint(`Skin switched: ${skin}`);
+    });
+
+    this.ui.onInventoryAction((action) => {
+      this.handleInventoryAction(action);
+    });
+
+    this.ui.onTaskAction((taskId) => {
+      this.handleTaskAction(taskId);
     });
   }
 
@@ -364,9 +385,9 @@ export class FarmScene extends Phaser.Scene {
     this.localPlayer.setSkin(this.selectedSkin);
     this.direction = player.direction;
     this.state = this.stateMachine.reset(player.state, Date.now());
-    this.coins = player.coins;
+    this.serverCoins = player.coins;
     this.localPlayer.setVisualState(this.direction, this.state);
-    this.ui.updateCoins(this.coins);
+    this.updateCoinsUi();
   }
 
   private createOrSyncRemote(player: PlayerSnapshot): void {
@@ -572,6 +593,7 @@ export class FarmScene extends Phaser.Scene {
     this.hideActionPanel();
     this.isTransitioning = true;
     this.ui.setInventoryVisible(false);
+    this.ui.setTaskBoardVisible(false);
     this.ui.showHint('Returning to lobby...');
     this.state = this.stateMachine.reset('idle', Date.now());
     this.localPlayer?.setVisualState(this.direction, this.state);
@@ -648,9 +670,12 @@ export class FarmScene extends Phaser.Scene {
         position: nextPosition,
         direction: 'down',
         state: 'idle',
-        coins: this.coins,
+        coins: this.serverCoins,
+        bonusCoins: this.localBonusCoins,
         skin: this.selectedSkin,
-        inventory: { ...this.inventory }
+        inventory: { ...this.inventory },
+        harvestTotals: { ...this.harvestTotals },
+        completedTaskIds: Array.from(this.completedTaskIds)
       },
       remotes: []
     };
@@ -659,6 +684,7 @@ export class FarmScene extends Phaser.Scene {
   private addToInventory(cropType: CropType, amount: number): void {
     this.inventory[cropType] = (this.inventory[cropType] ?? 0) + amount;
     this.updateInventoryUi();
+    this.updateTaskUi();
   }
 
   private updateInventoryUi(): void {
@@ -667,10 +693,144 @@ export class FarmScene extends Phaser.Scene {
       label: CROP_CATALOG[cropType].label,
       description: CROP_CATALOG[cropType].description,
       icon: CROP_CATALOG[cropType].icon,
-      count: this.inventory[cropType] ?? 0
+      count: this.inventory[cropType] ?? 0,
+      sellPrice: CROP_CATALOG[cropType].sellPrice,
+      taskAction: this.buildInventoryTaskAction(cropType)
     }));
 
     this.ui.updateInventory(items);
+  }
+
+  private updateTaskUi(): void {
+    const tasks: TaskViewItem[] = FARM_TASKS.map((task) => this.toTaskView(task));
+    this.ui.updateTasks(tasks);
+  }
+
+  private buildInventoryTaskAction(cropType: CropType): InventoryViewItem['taskAction'] {
+    const task = FARM_TASKS.find(
+      (entry) => entry.type === 'deliver' && entry.cropType === cropType && !this.completedTaskIds.has(entry.id)
+    );
+
+    if (!task) {
+      return undefined;
+    }
+
+    const current = this.inventory[cropType] ?? 0;
+    const ready = current >= task.target;
+
+    return {
+      taskId: task.id,
+      label: ready ? `Deliver +${task.rewardCoins}` : `Need ${current}/${task.target}`,
+      disabled: !ready
+    };
+  }
+
+  private toTaskView(task: FarmTaskDefinition): TaskViewItem {
+    const completed = this.completedTaskIds.has(task.id);
+    const progress = task.type === 'harvest'
+      ? Math.min(this.harvestTotals[task.cropType] ?? 0, task.target)
+      : Math.min(this.inventory[task.cropType] ?? 0, task.target);
+    const ready = progress >= task.target && !completed;
+    const cropLabel = this.cropLabel(task.cropType);
+    const detailPrefix = task.type === 'harvest' ? 'Harvest' : 'Deliver';
+
+    return {
+      id: task.id,
+      title: task.title,
+      detail: `${detailPrefix} ${cropLabel} | ${task.description}`,
+      progressText: `${progress}/${task.target}`,
+      rewardText: `Reward +${task.rewardCoins} coins`,
+      actionLabel: completed ? undefined : ready ? (task.type === 'harvest' ? 'Claim' : 'Deliver') : undefined,
+      completed
+    };
+  }
+
+  private handleInventoryAction(action: InventoryActionRequest): void {
+    if (action.type === 'deliver_task') {
+      this.handleTaskAction(action.taskId);
+      return;
+    }
+
+    const current = this.inventory[action.cropType] ?? 0;
+    if (current <= 0) {
+      return;
+    }
+
+    const amount = action.type === 'sell_all' ? current : 1;
+    const reward = amount * CROP_CATALOG[action.cropType].sellPrice;
+
+    this.inventory[action.cropType] = Math.max(0, current - amount);
+    this.addLocalCoins(reward);
+    this.updateInventoryUi();
+    this.updateTaskUi();
+    this.ui.showHint(`Sold ${amount} ${this.cropLabel(action.cropType)} for ${reward} coins`);
+  }
+
+  private handleTaskAction(taskId: string): void {
+    const task = FARM_TASKS.find((entry) => entry.id === taskId);
+    if (!task || this.completedTaskIds.has(task.id)) {
+      return;
+    }
+
+    if (task.type === 'harvest') {
+      if ((this.harvestTotals[task.cropType] ?? 0) < task.target) {
+        return;
+      }
+
+      this.completedTaskIds.add(task.id);
+      this.addLocalCoins(task.rewardCoins);
+      this.updateTaskUi();
+      this.updateInventoryUi();
+      this.ui.showHint(`${task.title} complete +${task.rewardCoins} coins`);
+      return;
+    }
+
+    const current = this.inventory[task.cropType] ?? 0;
+    if (current < task.target) {
+      return;
+    }
+
+    this.inventory[task.cropType] = current - task.target;
+    this.completedTaskIds.add(task.id);
+    this.addLocalCoins(task.rewardCoins);
+    this.updateInventoryUi();
+    this.updateTaskUi();
+    this.ui.showHint(`${task.title} delivered +${task.rewardCoins} coins`);
+  }
+
+  private recordHarvest(cropType: CropType, amount: number): void {
+    this.harvestTotals[cropType] = (this.harvestTotals[cropType] ?? 0) + amount;
+    this.updateTaskUi();
+
+    const newlyReady = FARM_TASKS.find(
+      (task) =>
+        task.type === 'harvest' &&
+        task.cropType === cropType &&
+        !this.completedTaskIds.has(task.id) &&
+        (this.harvestTotals[cropType] ?? 0) >= task.target
+    );
+
+    if (newlyReady) {
+      this.ui.showHint(`${newlyReady.title} ready to claim`);
+    }
+  }
+
+  private addLocalCoins(amount: number): void {
+    if (amount <= 0) {
+      return;
+    }
+
+    this.localBonusCoins += amount;
+    this.updateCoinsUi();
+  }
+
+  private setServerCoins(amount: number): void {
+    this.serverCoins = amount;
+    this.updateCoinsUi();
+  }
+
+  private updateCoinsUi(): void {
+    this.ui.updateCoins(this.serverCoins + this.localBonusCoins);
   }
 
   private formatRemainingSeconds(readyAt: number | undefined, now: number): string {

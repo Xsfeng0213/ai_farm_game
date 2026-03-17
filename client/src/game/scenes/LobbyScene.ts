@@ -10,6 +10,7 @@ import type {
 } from '../../types/protocol';
 import { LOBBY_CONFIG } from '../config/lobbyConfig';
 import { EMPTY_CROP_INVENTORY } from '../config/cropCatalog';
+import { EMPTY_HARVEST_TOTALS } from '../config/taskCatalog';
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { lobbyRoomId } from '../network/roomIds';
@@ -42,8 +43,11 @@ export class LobbyScene extends Phaser.Scene {
 
   private direction: FacingDirection = 'down';
   private state: MovePayload['state'] = 'idle';
-  private coins = 0;
+  private serverCoins = 0;
+  private localBonusCoins = 0;
   private inventory: Record<CropType, number> = { ...EMPTY_CROP_INVENTORY };
+  private harvestTotals: Record<CropType, number> = { ...EMPTY_HARVEST_TOTALS };
+  private readonly completedTaskIds = new Set<string>();
   private selectedSkin: PlayerSkin = 'skin1';
   private pendingTransition: SceneSessionData['local'] | null = null;
 
@@ -67,8 +71,12 @@ export class LobbyScene extends Phaser.Scene {
       this.selectedSkin = data.session.local.skin;
       this.direction = data.session.local.direction;
       this.state = data.session.local.state;
-      this.coins = data.session.local.coins;
+      this.serverCoins = data.session.local.coins;
+      this.localBonusCoins = data.session.local.bonusCoins ?? 0;
       this.inventory = { ...EMPTY_CROP_INVENTORY, ...(data.session.local.inventory ?? {}) };
+      this.harvestTotals = { ...EMPTY_HARVEST_TOTALS, ...(data.session.local.harvestTotals ?? {}) };
+      this.completedTaskIds.clear();
+      (data.session.local.completedTaskIds ?? []).forEach((id) => this.completedTaskIds.add(id));
     }
 
     this.buildWorld();
@@ -88,8 +96,10 @@ export class LobbyScene extends Phaser.Scene {
       nickname: this.nickname
     });
 
-    this.ui.updateCoins(this.coins);
+    this.updateCoinsUi();
     this.ui.setInventoryVisible(false);
+    this.ui.setTaskBoardVisible(false);
+    this.ui.updateTasks([]);
     this.ui.showHint('Use WASD / Arrow keys to move');
     this.ui.appendChat('[system] Lobby connected');
     this.syncRoomHud();
@@ -120,9 +130,13 @@ export class LobbyScene extends Phaser.Scene {
     this.lastSentSignature = '';
     this.direction = 'down';
     this.state = 'idle';
+    this.serverCoins = 0;
+    this.localBonusCoins = 0;
     this.inputSystem = null;
     this.interactionSystem = null;
     this.interactKey = null;
+    this.harvestTotals = { ...EMPTY_HARVEST_TOTALS };
+    this.completedTaskIds.clear();
 
     this.localPlayer = null;
     this.remotePlayers.clear();
@@ -218,6 +232,9 @@ export class LobbyScene extends Phaser.Scene {
       this.localPlayer?.setSkin(skin);
       this.ui.showHint(`Skin switched: ${skin}`);
     });
+
+    this.ui.onInventoryAction(() => {});
+    this.ui.onTaskAction(() => {});
   }
 
   private handleRoomState(payload: RoomStatePayload): void {
@@ -274,9 +291,9 @@ export class LobbyScene extends Phaser.Scene {
     this.localPlayer.setSkin(this.selectedSkin);
     this.direction = player.direction;
     this.state = this.stateMachine.reset(player.state, Date.now());
-    this.coins = player.coins;
+    this.serverCoins = player.coins;
     this.localPlayer.setVisualState(this.direction, this.state);
-    this.ui.updateCoins(this.coins);
+    this.updateCoinsUi();
   }
 
   private createOrSyncRemote(player: PlayerSnapshot): void {
@@ -399,8 +416,8 @@ export class LobbyScene extends Phaser.Scene {
 
   private handleInteractionState(payload: InteractionStatePayload): void {
     if (payload.playerId === this.selfId) {
-      this.coins = payload.coins;
-      this.ui.updateCoins(this.coins);
+      this.serverCoins = payload.coins;
+      this.updateCoinsUi();
       this.state = this.stateMachine.syncFromServer(payload.state, Date.now());
       this.localPlayer?.setVisualState(this.direction, this.state);
       return;
@@ -466,11 +483,18 @@ export class LobbyScene extends Phaser.Scene {
         position: nextPosition,
         direction: 'down',
         state: 'idle',
-        coins: this.coins,
+        coins: this.serverCoins,
+        bonusCoins: this.localBonusCoins,
         skin: this.selectedSkin,
-        inventory: { ...this.inventory }
+        inventory: { ...this.inventory },
+        harvestTotals: { ...this.harvestTotals },
+        completedTaskIds: Array.from(this.completedTaskIds)
       },
       remotes: []
     };
+  }
+
+  private updateCoinsUi(): void {
+    this.ui.updateCoins(this.serverCoins + this.localBonusCoins);
   }
 }

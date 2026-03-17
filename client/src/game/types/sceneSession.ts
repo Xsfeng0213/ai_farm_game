@@ -13,8 +13,11 @@ export interface LocalPlayerSession {
   direction: FacingDirection;
   state: PlayerState;
   coins: number;
+  bonusCoins?: number;
   skin: PlayerSkin;
   inventory?: Record<CropType, number>;
+  harvestTotals?: Record<CropType, number>;
+  completedTaskIds?: string[];
 }
 
 export interface SceneSessionData {

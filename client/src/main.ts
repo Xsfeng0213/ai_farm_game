@@ -28,6 +28,14 @@ app.innerHTML = `
         <button type="button" data-skin="skin3">Style C</button>
       </section>
 
+      <section id="task-panel" class="pixel-frame task-panel is-hidden">
+        <div class="task-head">
+          <div class="task-header">Field Orders</div>
+          <div class="task-subtitle">Local goals</div>
+        </div>
+        <div id="task-list" class="task-list"></div>
+      </section>
+
       <section class="pixel-frame hint-bar">
         <span id="hint-label" class="hint-label">Input nickname to enter</span>
       </section>
@@ -44,6 +52,11 @@ app.innerHTML = `
           <div id="inventory-tooltip-title" class="inventory-tooltip-title">Crop</div>
           <div id="inventory-tooltip-count" class="inventory-tooltip-count">Qty 0</div>
           <div id="inventory-tooltip-desc" class="inventory-tooltip-desc">Harvest to store crops.</div>
+          <div class="inventory-tooltip-actions">
+            <button id="inventory-sell-btn" type="button">Sell</button>
+            <button id="inventory-sell-all-btn" type="button">Sell All</button>
+          </div>
+          <button id="inventory-task-btn" class="inventory-task-btn is-hidden" type="button">Deliver</button>
         </aside>
       </section>
 
@@ -79,6 +92,8 @@ app.innerHTML = `
 const roomLabel = document.querySelector<HTMLElement>('#room-label');
 const coinsLabel = document.querySelector<HTMLElement>('#coins-label');
 const hintLabel = document.querySelector<HTMLElement>('#hint-label');
+const taskPanel = document.querySelector<HTMLElement>('#task-panel');
+const taskList = document.querySelector<HTMLElement>('#task-list');
 const inventoryToggleButton = document.querySelector<HTMLButtonElement>('#inventory-toggle-btn');
 const inventoryPanel = document.querySelector<HTMLElement>('#inventory-panel');
 const inventoryGrid = document.querySelector<HTMLElement>('#inventory-grid');
@@ -86,6 +101,9 @@ const inventoryTooltip = document.querySelector<HTMLElement>('#inventory-tooltip
 const inventoryTooltipTitle = document.querySelector<HTMLElement>('#inventory-tooltip-title');
 const inventoryTooltipCount = document.querySelector<HTMLElement>('#inventory-tooltip-count');
 const inventoryTooltipDesc = document.querySelector<HTMLElement>('#inventory-tooltip-desc');
+const inventorySellButton = document.querySelector<HTMLButtonElement>('#inventory-sell-btn');
+const inventorySellAllButton = document.querySelector<HTMLButtonElement>('#inventory-sell-all-btn');
+const inventoryTaskButton = document.querySelector<HTMLButtonElement>('#inventory-task-btn');
 const chatList = document.querySelector<HTMLElement>('#chat-list');
 const chatInput = document.querySelector<HTMLInputElement>('#chat-input');
 const sendButton = document.querySelector<HTMLButtonElement>('#send-btn');
@@ -102,6 +120,8 @@ if (
   !roomLabel ||
   !coinsLabel ||
   !hintLabel ||
+  !taskPanel ||
+  !taskList ||
   !inventoryToggleButton ||
   !inventoryPanel ||
   !inventoryGrid ||
@@ -109,6 +129,9 @@ if (
   !inventoryTooltipTitle ||
   !inventoryTooltipCount ||
   !inventoryTooltipDesc ||
+  !inventorySellButton ||
+  !inventorySellAllButton ||
+  !inventoryTaskButton ||
   !chatList ||
   !chatInput ||
   !sendButton ||
@@ -127,6 +150,8 @@ const ui = new DomUiBridge({
   roomLabel,
   coinsLabel,
   hintLabel,
+  taskPanel,
+  taskList,
   inventoryToggleButton,
   inventoryPanel,
   inventoryGrid,
@@ -134,6 +159,9 @@ const ui = new DomUiBridge({
   inventoryTooltipTitle,
   inventoryTooltipCount,
   inventoryTooltipDesc,
+  inventorySellButton,
+  inventorySellAllButton,
+  inventoryTaskButton,
   chatList,
   chatInput,
   sendButton,

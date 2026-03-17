@@ -1,0 +1,127 @@
+{
+  "startedAt": "2026-03-17T10:53:49.506Z",
+  "steps": [
+    "login and enter farm",
+    "move both clients near west plots",
+    "check task board is visible",
+    "probe crop menu ui and plant four plots",
+    "A waters and fertilizes all four plots",
+    "B sees synced growing state",
+    "wait for maturity and harvest",
+    "open bag and verify deliver and sell flows",
+    "claim wheat harvest task from task board",
+    "B confirms empty plot sync after A harvest",
+    "chat collapse and unread still work"
+  ],
+  "clientA": {
+    "room": "Room lobby-1:farm | Online 2",
+    "initialTasks": {
+      "wheat": {
+        "title": "Harvest 6 Wheat",
+        "progress": "0/6",
+        "reward": "Reward +8 coins",
+        "status": "Active",
+        "actionLabel": null
+      },
+      "carrot": {
+        "title": "Deliver 2 Carrot",
+        "progress": "0/2",
+        "reward": "Reward +7 coins",
+        "status": "Active",
+        "actionLabel": null
+      },
+      "potato": {
+        "title": "Deliver 2 Potato",
+        "progress": "0/2",
+        "reward": "Reward +9 coins",
+        "status": "Active",
+        "actionLabel": null
+      }
+    },
+    "cropMenuProbe": [
+      "wheat",
+      "carrot",
+      "potato"
+    ],
+    "postPlantHint": "Press E to care Carrot | 21s | W:N F:N",
+    "afterHarvestCoins": "Coins 11",
+    "goalLoop": {
+      "bagSlotCount": 48,
+      "carrotTooltip": {
+        "title": "Carrot",
+        "qty": "Qty 2",
+        "desc": "Balanced growth and reward. A reliable mid-cycle crop.",
+        "sell": "Sell +2",
+        "sellAll": "Sell All +4",
+        "taskVisible": true,
+        "taskLabel": "Deliver +7",
+        "taskDisabled": false
+      },
+      "carrotTaskAfterDeliver": {
+        "title": "Deliver 2 Carrot",
+        "progress": "0/2",
+        "reward": "Reward +7 coins",
+        "status": "Done",
+        "actionLabel": null
+      },
+      "carrotSlotsAfterDeliver": 0,
+      "coinsAfterDeliver": "Coins 18",
+      "potatoTooltipBeforeSell": {
+        "title": "Potato",
+        "qty": "Qty 2",
+        "desc": "Slowest growth, but highest coin reward per harvest.",
+        "sell": "Sell +3",
+        "sellAll": "Sell All +6",
+        "taskVisible": true,
+        "taskLabel": "Deliver +9",
+        "taskDisabled": false
+      },
+      "potatoTooltipAfterSell": {
+        "title": "Potato",
+        "qty": "Qty 1",
+        "desc": "Slowest growth, but highest coin reward per harvest.",
+        "sell": "Sell +3",
+        "sellAll": "Sell All +3",
+        "taskVisible": true,
+        "taskLabel": "Need 1/2",
+        "taskDisabled": true
+      },
+      "potatoTaskAfterSell": {
+        "title": "Deliver 2 Potato",
+        "progress": "1/2",
+        "reward": "Reward +9 coins",
+        "status": "Active",
+        "actionLabel": null
+      },
+      "coinsAfterSell": "Coins 21",
+      "wheatTaskAfterClaim": {
+        "title": "Harvest 6 Wheat",
+        "progress": "6/6",
+        "reward": "Reward +8 coins",
+        "status": "Done",
+        "actionLabel": null
+      },
+      "coinsAfterClaim": "Coins 29",
+      "wheatTooltip": {
+        "title": "Wheat",
+        "qty": "Qty 6",
+        "desc": "Fast growth. Good for quick, steady harvest loops.",
+        "sell": "Sell +1",
+        "sellAll": "Sell All +6",
+        "taskVisible": false,
+        "taskLabel": "Deliver",
+        "taskDisabled": true
+      }
+    },
+    "chatCollapsed": true,
+    "chatToggleTextWhileCollapsed": "Chat (1)",
+    "chatExpanded": true
+  },
+  "clientB": {
+    "room": "Room lobby-1:farm | Online 2",
+    "growingHint": "Carrot growing at West A2 | 6s",
+    "afterHarvestHint": "Press E to choose crop for West A2"
+  },
+  "errors": [],
+  "endedAt": "2026-03-17T10:55:03.374Z"
+}
